@@ -66,7 +66,7 @@ export const InventoryChatbot: React.FC<InventoryChatbotProps> = ({
         {
           id: 'welcome',
           sender: 'bot',
-          text: `👋 您好，**${currentOperator.name}**！我是賢欣貨架智能庫存助理。\n\n我能隨時為您查詢料件存放位置、即時庫存數量、缺貨/低庫存告警、盤點差異及補貨建議。請點選下方快捷問題或直接輸入您的需求！`,
+          text: `👋 您好，**${currentOperator.name}**！我是賢欣貨架 AI 智能助理，已成功連線 **NVIDIA DGX GPU (Qwen3-8B)** 算力中心！\n\n我具備真實大語言模型推理能力，能隨時為您查詢料件存放位置、即時庫存數量、缺貨/低庫存告警、盤點差異及採購補貨建議。請直接輸入您的問題或點選下方快捷建議！`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           suggestions: [
             '🚨 查詢缺貨與低庫存料件',
@@ -329,19 +329,21 @@ export const InventoryChatbot: React.FC<InventoryChatbotProps> = ({
     };
   };
 
-  // Optional: Gemini API Call if API Key configured
-  const callGeminiAPI = async (query: string): Promise<string> => {
-    const warehouseContext = {
+  // DGX GPU AI Call (calls backend /api/chat proxying to https://dgx-api.ovantech.com.tw/v1)
+  const callDgxGpuAPI = async (query: string): Promise<string> => {
+    const warehouseData = {
       currentTime: new Date().toISOString(),
       currentOperator: currentOperator.name,
       items: items.map(i => ({
         sku: i.sku,
         name: i.name,
+        finishedProductName: i.finishedProductName,
         quantity: i.quantity,
         unit: i.unit,
         shelfLocation: i.shelfLocation,
         zone: i.zone,
         minSafeQuantity: i.minSafeQuantity,
+        maxCapacity: i.maxCapacity,
         status: i.status,
         lastCountDiscrepancy: i.lastCountDiscrepancy,
         notes: i.notes
@@ -354,37 +356,29 @@ export const InventoryChatbot: React.FC<InventoryChatbotProps> = ({
       }))
     };
 
-    const prompt = `你是「賢欣工業貨架管理系統 (Hsien-Hsin WMS Pro)」的專業 AI 倉管問答專家。
-當前操作人員是：${currentOperator.name}。
-這是目前倉庫即時庫存與貨架數據庫：
-${JSON.stringify(warehouseContext, null, 2)}
-
-請以親切、專業、條理清晰且繁體中文（台灣習慣用語）回答使用者的問題。
-支援使用 Markdown 標題、粗體、清單以方便閱讀。
-若問題與特定料件或貨架有關，請務必精準指出其貨號 (SKU)、存放貨架位置 (例如 A區-01架-2層-01位) 與當前數量。
-
-使用者問題：${query}`;
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
-    const response = await fetch(url, {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 1024,
+        userQuery: query,
+        history: messages.slice(-6).map(m => ({
+          role: m.sender === 'user' ? 'user' : 'assistant',
+          content: m.text
+        })),
+        context: {
+          operatorName: currentOperator.name,
+          warehouseData
         }
       })
     });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.error?.message || `HTTP ${response.status}`);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
     }
 
-    const data = await response.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '抱歉，暫時無法從 Gemini 取得回應。';
+    const data = await res.json();
+    return data.reply || '已收到您的問題，但未取得有效回覆內容。';
   };
 
   // Handle Send Message
@@ -408,34 +402,40 @@ ${JSON.stringify(warehouseContext, null, 2)}
       let relatedItems: InventoryItem[] | undefined;
       let suggestions: string[] | undefined;
 
-      // Check if Gemini API is available and enabled
-      if (geminiApiKey && geminiApiKey.trim().length > 10) {
-        try {
-          botResponseText = await callGeminiAPI(query);
-          // Also detect if any items match query to show cards
-          const q = query.toLowerCase();
-          relatedItems = items.filter(i => 
-            i.name.toLowerCase().includes(q) || 
-            i.sku.toLowerCase().includes(q) ||
-            (q.includes('缺貨') && i.quantity === 0) ||
-            (q.includes('馬達') && i.name.includes('馬達')) ||
-            (q.includes('氣壓缸') && i.name.includes('氣壓缸')) ||
-            (q.includes('plc') && i.name.includes('PLC'))
-          ).slice(0, 3);
-        } catch (apiErr: any) {
-          console.warn('Gemini API call failed, falling back to local engine:', apiErr);
-          const localResult = processLocalQuery(query);
-          botResponseText = localResult.text;
-          relatedItems = localResult.relatedItems;
-          suggestions = localResult.suggestions;
-        }
-      } else {
-        // Fast local intelligent engine
-        await new Promise(r => setTimeout(r, 300));
+      try {
+        // 1. Call real NVIDIA DGX GPU AI Server (Qwen3-8B)
+        botResponseText = await callDgxGpuAPI(query);
+      } catch (gpuErr: any) {
+        console.warn('DGX GPU API call failed, falling back to local engine:', gpuErr);
         const localResult = processLocalQuery(query);
         botResponseText = localResult.text;
-        relatedItems = localResult.relatedItems;
         suggestions = localResult.suggestions;
+      }
+
+      // Automatically scan query and AI response for mentioned warehouse items
+      const q = query.toLowerCase();
+      const r = botResponseText.toLowerCase();
+      relatedItems = items.filter(i => 
+        q.includes(i.name.toLowerCase()) || 
+        q.includes(i.sku.toLowerCase()) ||
+        r.includes(i.name.toLowerCase()) ||
+        r.includes(i.sku.toLowerCase()) ||
+        (q.includes('缺貨') && i.quantity === 0) ||
+        (q.includes('低庫存') && i.quantity <= i.minSafeQuantity) ||
+        (q.includes('馬達') && i.name.includes('馬達')) ||
+        (q.includes('氣壓缸') && i.name.includes('氣壓缸')) ||
+        (q.includes('plc') && i.name.includes('PLC')) ||
+        (q.includes('齒輪') && i.name.includes('齒輪'))
+      ).slice(0, 3);
+
+      if (!suggestions) {
+        suggestions = [
+          '🚨 查詢缺貨與低庫存料件',
+          '📍 步進馬達放在哪個貨架？',
+          '⚠️ 盤點差異有哪些？',
+          '📊 全廠庫存現況總覽',
+          '💡 產生採購補貨建議'
+        ];
       }
 
       const botMessage: ChatMessage = {
@@ -443,7 +443,7 @@ ${JSON.stringify(warehouseContext, null, 2)}
         sender: 'bot',
         text: botResponseText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        relatedItems,
+        relatedItems: relatedItems.length > 0 ? relatedItems : undefined,
         suggestions
       };
 
@@ -514,11 +514,13 @@ ${JSON.stringify(warehouseContext, null, 2)}
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-sm sm:text-base text-white">
                   <span>賢欣 AI 庫存智能助理</span>
-                  <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>DGX GPU</span>
+                  </span>
                 </div>
                 <div className="text-xs text-slate-400 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>即時盤點資料連線</span>
+                  <span className="text-amber-400 font-medium">Qwen3-8B 實體運算中</span>
                   <span>•</span>
                   <span>操作員：{currentOperator.name}</span>
                 </div>
@@ -528,9 +530,9 @@ ${JSON.stringify(warehouseContext, null, 2)}
             <div className="flex items-center space-x-1">
               <button
                 onClick={() => setShowSettings(!showSettings)}
-                title="AI 設定與 API Key"
+                title="DGX GPU 伺服器連線資訊"
                 className={`p-2 rounded-lg transition-colors ${
-                  geminiApiKey ? 'text-amber-400 bg-amber-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  showSettings ? 'text-amber-400 bg-amber-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-800'
                 }`}
               >
                 <Key className="w-4 h-4" />
@@ -554,37 +556,38 @@ ${JSON.stringify(warehouseContext, null, 2)}
             </div>
           </div>
 
-          {/* Optional Gemini API Key Settings Panel */}
+          {/* DGX GPU AI Status & Configuration Panel */}
           {showSettings && (
-            <div className="p-3.5 bg-slate-950 border-b border-slate-800 text-xs text-slate-300">
-              <div className="font-semibold text-slate-200 mb-1.5 flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>Google Gemini AI 增強模式設定</span>
-              </div>
-              <p className="text-slate-400 mb-2">
-                內建已支援本地即時倉儲智慧問答。若填入 Gemini API Key，可解鎖深層自然語言推理與跨料件分析能力。
-              </p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="password"
-                  placeholder="請輸入 Gemini API Key (AI Studio)"
-                  value={tempApiKey}
-                  onChange={(e) => setTempApiKey(e.target.value)}
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                />
-                <button
-                  onClick={handleSaveApiKey}
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-lg transition-colors"
-                >
-                  儲存
-                </button>
-              </div>
-              {geminiApiKey && (
-                <div className="mt-1.5 text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Gemini AI Key 已啟用</span>
+            <div className="p-3.5 bg-slate-950 border-b border-slate-800 text-xs text-slate-300 space-y-2">
+              <div className="font-semibold text-slate-200 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span>NVIDIA DGX GPU 算力叢集連線資訊</span>
                 </div>
-              )}
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full font-mono text-[10px] flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  <span>即時推論連線中</span>
+                </span>
+              </div>
+
+              <div className="bg-slate-900/90 rounded-xl p-2.5 border border-slate-800 space-y-1 font-mono text-[11px]">
+                <div className="flex justify-between text-slate-400">
+                  <span>GPU 伺服器端點：</span>
+                  <span className="text-slate-200">https://dgx-api.ovantech.com.tw/v1</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>大語言模型核心：</span>
+                  <span className="text-amber-300 font-bold">qwen3-8b (通義千問 3)</span>
+                </div>
+                <div className="flex justify-between text-slate-400">
+                  <span>GPU API 金鑰驗證：</span>
+                  <span className="text-emerald-400">dgx_Q4tx...xTSto (已啟用)</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-slate-400">
+                本系統所有提問均直接傳送至專用 NVIDIA DGX GPU 伺服器進行即時推理，並結合即時庫存資料庫提供精準的盤點與貨架解答。
+              </p>
             </div>
           )}
 

@@ -13,6 +13,10 @@ const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'inventory.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 
+const DGX_API_URL = 'https://dgx-api.ovantech.com.tw/v1/chat/completions';
+const DGX_API_KEY = 'dgx_Q4txLJEuu5qqZDmjT5EdYE9jVmDxQFvDi3fgBCxTSto';
+const DGX_MODEL = 'qwen3-8b';
+
 // Interface definition matching client
 export interface InventoryHistory {
   id: string;
@@ -631,6 +635,69 @@ async function startServer() {
   });
 
   // REST API Routes
+
+  // AI Chatbot with DGX GPU API (Qwen3-8B)
+  app.post('/api/chat', async (req, res) => {
+    try {
+      const { messages, userQuery, context } = req.body || {};
+
+      let chatMessages = messages;
+      if (!chatMessages && userQuery) {
+        const systemPrompt = `你是「賢欣貨架管理系統 (Hsien-Hsin WMS Pro)」的專業 AI 倉管問答專家。
+當前操作人員是：${context?.operatorName || '倉管人員'}。
+這是目前倉庫即時庫存與貨架數據庫：
+${JSON.stringify(context?.warehouseData || {}, null, 2)}
+
+請以親切、專業、條理清晰且繁體中文（台灣習慣用語）回答使用者的問題。
+支援使用 Markdown 標題、粗體、清單以方便閱讀。
+若問題與特定料件或貨架有關，請務必精準指出其貨號 (SKU)、存放貨架位置 (例如 A區-01架-2層-01位) 與當前數量。`;
+
+        chatMessages = [
+          { role: 'system', content: systemPrompt },
+          ...(req.body.history || []),
+          { role: 'user', content: userQuery }
+        ];
+      }
+
+      if (!chatMessages || !Array.isArray(chatMessages)) {
+        return res.status(400).json({ error: '請提供對話訊息內容' });
+      }
+
+      const dgxRes = await fetch(DGX_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${DGX_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: DGX_MODEL,
+          messages: chatMessages,
+          temperature: 0.3,
+          max_tokens: 1024,
+        }),
+      });
+
+      if (!dgxRes.ok) {
+        const errText = await dgxRes.text();
+        console.error('DGX API error:', dgxRes.status, errText);
+        return res.status(502).json({ error: `DGX GPU API 伺服器回應異常: ${dgxRes.status}` });
+      }
+
+      const dgxData: any = await dgxRes.json();
+      const reply = dgxData.choices?.[0]?.message?.content || '';
+
+      res.json({
+        success: true,
+        reply,
+        model: DGX_MODEL,
+        provider: 'NVIDIA DGX GPU (Qwen3-8B)',
+        usage: dgxData.usage,
+      });
+    } catch (err: any) {
+      console.error('Fetch to DGX failed:', err);
+      res.status(500).json({ error: `無法連線至 DGX GPU 伺服器: ${err.message}` });
+    }
+  });
 
   // Auth: Login
   app.post('/api/auth/login', (req, res) => {
