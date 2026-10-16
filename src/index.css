@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-labels-container, #printable-labels-container * {
+    visibility: visible;
+  }
+  #printable-labels-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+    padding: 10px !important;
+  }
+  .warehouse-label {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 2px solid #000 !important;
+    color: #000 !important;
+    background: #fff !important;
+  }
+}

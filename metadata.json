@@ -1,0 +1,8 @@
+{
+  "name": "賢欣貨架管理系統",
+  "description": "專業倉庫貨架與庫存管理系統，具備即時多人同步、QR Code 標籤生成與掃描盤點、異常告警及平板觸控最佳化介面。",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

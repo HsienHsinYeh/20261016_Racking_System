@@ -1,0 +1,47 @@
+[
+  {
+    "id": "usr-admin",
+    "username": "admin",
+    "passwordHash": "admin",
+    "name": "系統管理員 (主管)",
+    "role": "系統最高主管 / 全權限",
+    "avatar": "🛡️",
+    "department": "智慧倉儲運營部"
+  },
+  {
+    "id": "usr-chen",
+    "username": "chen",
+    "passwordHash": "admin",
+    "name": "陳建良",
+    "role": "A/B區資深倉管員",
+    "avatar": "👨‍🔧",
+    "department": "倉儲物流部"
+  },
+  {
+    "id": "usr-chang",
+    "username": "chang",
+    "passwordHash": "admin",
+    "name": "張家豪",
+    "role": "倉管課長 / 系統主管",
+    "avatar": "👨‍💼",
+    "department": "運營管理部"
+  },
+  {
+    "id": "usr-wang",
+    "username": "wang",
+    "passwordHash": "admin",
+    "name": "王小華",
+    "role": "現場入出庫專員",
+    "avatar": "👩‍🔧",
+    "department": "倉儲物流部"
+  },
+  {
+    "id": "usr-lee",
+    "username": "lee",
+    "passwordHash": "admin",
+    "name": "李秉勳",
+    "role": "品管檢驗組長",
+    "avatar": "🧑‍🔬",
+    "department": "品質保證部"
+  }
+]
