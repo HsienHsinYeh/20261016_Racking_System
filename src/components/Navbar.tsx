@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Bot
 } from 'lucide-react';
 import { Operator, ConnectedUser, SystemAlert, AuthUser } from '../types/inventory';
 
@@ -34,6 +35,7 @@ interface NavbarProps {
   onOpenAlerts: () => void;
   onOpenAccountManagement: () => void;
   onResetSeed: () => void;
+  onOpenChatbot: () => void;
   activeView: 'list' | 'shelf_map' | 'audit';
   onChangeView: (view: 'list' | 'shelf_map' | 'audit') => void;
   onLogout: () => void;
@@ -55,6 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAlerts,
   onOpenAccountManagement,
   onResetSeed,
+  onOpenChatbot,
   activeView,
   onChangeView,
   onLogout,
@@ -180,6 +183,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden md:inline">帳號管理</span>
               </button>
             )}
+
+            {/* AI Assistant Button */}
+            <button
+              onClick={onOpenChatbot}
+              className="p-2 sm:px-3 sm:py-2 bg-gradient-to-r from-amber-500/10 via-amber-400/20 to-amber-500/10 hover:from-amber-500/20 hover:to-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              title="開啟賢欣 AI 庫存智能助理"
+            >
+              <Bot className="w-4 h-4 text-amber-400 animate-pulse" />
+              <span className="hidden md:inline">AI 助理</span>
+            </button>
 
             {/* Alerts Bell */}
             <button

@@ -20,6 +20,7 @@ import { AlertsModal } from './components/AlertsModal';
 import { RealtimeToast, ToastMessage } from './components/RealtimeToast';
 import { LoginView } from './components/LoginView';
 import { AccountManagementModal } from './components/AccountManagementModal';
+import { InventoryChatbot } from './components/InventoryChatbot';
 import { playSound } from './utils/sound';
 import { 
   InventoryItem, 
@@ -73,6 +74,7 @@ export default function App() {
   const [auditTargetItem, setAuditTargetItem] = useState<InventoryItem | null>(null);
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState<boolean>(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
+  const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
   const [defaultShelfForAdd, setDefaultShelfForAdd] = useState<any>(null);
 
   // Real-time toast notifications
@@ -418,6 +420,7 @@ export default function App() {
         onOpenAlerts={() => setIsAlertsModalOpen(true)}
         onOpenAccountManagement={() => setIsAccountModalOpen(true)}
         onResetSeed={handleResetSeed}
+        onOpenChatbot={() => setIsChatbotOpen(prev => !prev)}
         activeView={activeView}
         onChangeView={setActiveView}
         onLogout={handleLogout}
@@ -595,6 +598,20 @@ export default function App() {
           realtimeClient.fetchOperators().then(ops => setOperators(ops)).catch(console.warn);
         }}
         onAddToast={addToast}
+      />
+
+      {/* Floating Inventory Chatbot */}
+      <InventoryChatbot
+        isOpen={isChatbotOpen}
+        onToggle={() => setIsChatbotOpen(prev => !prev)}
+        items={items}
+        alerts={alerts}
+        currentOperator={currentOperator}
+        onSelectItem={(item) => setSelectedItemDrawer(item)}
+        onNavigateToShelfMap={(zone) => {
+          setActiveView('shelf_map');
+          if (zone) setSelectedFilter(zone);
+        }}
       />
 
       {/* Floating Multi-User Real-time Sync Toasts */}
