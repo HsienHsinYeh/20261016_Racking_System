@@ -396,14 +396,16 @@ export default function App() {
             );
             const parts = newShelfLocation.split('-');
             const newZone = parts[0] || item.zone;
-            const newRack = parts[1]?.replace('架', '') || item.shelfRack;
-            await realtimeClient.updateItem({
-              ...item,
-              shelfLocation: newShelfLocation,
-              zone: newZone,
-              shelfRack: newRack,
-              updatedBy: currentOperator.name
-            }, '調撥變更貨架編號');
+            await realtimeClient.updateItem(
+              item.id,
+              {
+                shelfLocation: newShelfLocation,
+                zone: newZone,
+                shelfRack: newRack,
+              },
+              currentOperator.name,
+              '調撥變更貨架編號'
+            );
           }
         }
       }

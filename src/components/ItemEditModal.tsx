@@ -70,6 +70,8 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
   const [rack, setRack] = useState('01');
   const [tier, setTier] = useState('1層');
   const [bin, setBin] = useState('01');
+  const [isCustomZone, setIsCustomZone] = useState(false);
+  const [isCustomRack, setIsCustomRack] = useState(false);
   const [photo, setPhoto] = useState('');
   const [notes, setNotes] = useState('');
   const [minSafeQuantity, setMinSafeQuantity] = useState<number>(10);
@@ -85,20 +87,46 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
       setFinishedProductName(item.finishedProductName);
       setQuantity(item.quantity);
       setUnit(item.unit || '件');
-      setZone(item.zone || 'A區');
-      setRack(item.shelfRack || '01');
-      setTier(item.shelfTier || '1層');
-      setBin(item.shelfBin || '01');
+
+      // Robust extraction of zone/rack/tier/bin from item fields or shelfLocation
+      let extractedZone = item.zone;
+      let extractedRack = item.shelfRack;
+      let extractedTier = item.shelfTier;
+      let extractedBin = item.shelfBin;
+
+      if (!extractedZone || !extractedRack || !extractedTier || !extractedBin) {
+        const parts = (item.shelfLocation || '').split('-');
+        if (parts.length >= 4) {
+          extractedZone = extractedZone || parts[0];
+          extractedRack = extractedRack || parts[1]?.replace('架', '');
+          extractedTier = extractedTier || parts[2];
+          extractedBin = extractedBin || parts[3]?.replace('位', '');
+        }
+      }
+
+      const cleanZone = extractedZone || 'A區';
+      const cleanRack = extractedRack ? extractedRack.replace('架', '') : '01';
+      const cleanTier = extractedTier || '1層';
+      const cleanBin = extractedBin ? extractedBin.replace('位', '') : '01';
+
+      setZone(cleanZone);
+      setRack(cleanRack);
+      setTier(cleanTier);
+      setBin(cleanBin);
       setPhoto(item.photo || '');
       setNotes(item.notes || '');
       setMinSafeQuantity(item.minSafeQuantity || 10);
       setEditNote('');
+
+      const matchedZone = zoneList.some(z => z.id === cleanZone);
+      setIsCustomZone(!matchedZone);
+      setIsCustomRack(false);
     } else {
       // Default creation
       const initZone = defaultShelf?.zone || 'A區';
-      const initRack = defaultShelf?.rack || '01';
+      const initRack = defaultShelf?.rack ? defaultShelf.rack.replace('架', '') : '01';
       const initTier = defaultShelf?.tier || '1層';
-      const initBin = defaultShelf?.bin || '01';
+      const initBin = defaultShelf?.bin ? defaultShelf.bin.replace('位', '') : '01';
 
       setSku(`HH-${initZone.charAt(0)}${initRack}-${Math.floor(100 + Math.random() * 900)}`);
       setName('');
@@ -113,13 +141,15 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
       setNotes('');
       setMinSafeQuantity(10);
       setEditNote('');
+      setIsCustomZone(false);
+      setIsCustomRack(false);
     }
     setError(null);
   }, [item, defaultShelf, isOpen]);
 
   if (!isOpen) return null;
 
-  const currentZoneObj = zoneList.find(z => z.id === zone) || zoneList[0];
+  const currentZoneObj = zoneList.find(z => z.id === zone);
   const availableRacks = currentZoneObj?.racks || [];
   const currentRackObj = availableRacks.find(r => (typeof r === 'string' ? r === rack : r.code === rack));
   const maxTier = currentRackObj ? (typeof currentRackObj === 'string' ? 4 : (currentRackObj.tierCount || 4)) : 4;
@@ -135,13 +165,17 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
     }
   };
 
+  const cleanRack = (rack || '01').replace(/架$/, '').trim() || '01';
+  const cleanTier = tier.endsWith('層') ? tier.trim() : `${tier.trim()}層`;
+  const cleanBin = (bin || '01').replace(/位$/, '').trim() || '01';
+
   // Formatted shelf location
-  const formattedShelfLocation = `${zone}-${rack}架-${tier}-${bin}位`;
+  const formattedShelfLocation = `${zone.trim()}-${cleanRack}架-${cleanTier}-${cleanBin}位`;
 
   // Auto generate SKU
   const generateNewSku = () => {
     const randomNum = Math.floor(100 + Math.random() * 900);
-    const prefix = `HH-${zone.charAt(0)}${rack}`;
+    const prefix = `HH-${zone.charAt(0)}${cleanRack}`;
     setSku(`${prefix}-${randomNum}`);
   };
 
@@ -185,10 +219,10 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
         quantity: Math.max(0, Number(quantity) || 0),
         unit: unit.trim() || '件',
         shelfLocation: formattedShelfLocation,
-        zone,
-        shelfRack: rack,
-        shelfTier: tier,
-        shelfBin: bin,
+        zone: zone.trim(),
+        shelfRack: cleanRack,
+        shelfTier: cleanTier,
+        shelfBin: cleanBin,
         photo: photo || SAMPLE_PHOTOS[0].url,
         notes: notes.trim(),
         minSafeQuantity: Math.max(0, Number(minSafeQuantity) || 5),
@@ -389,47 +423,106 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
 
             <div className="grid grid-cols-4 gap-2">
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">區域 (分區)</label>
-                <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">區域 (分區)</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomZone(!isCustomZone)}
+                    className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    {isCustomZone ? '切換下拉' : '手動輸入'}
+                  </button>
+                </div>
+                {isCustomZone ? (
                   <input
                     type="text"
-                    list="item-zone-datalist"
                     value={zone}
-                    onChange={(e) => handleZoneChange(e.target.value)}
-                    placeholder="分區 (如 A區, E區)"
-                    className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200"
+                    onChange={(e) => setZone(e.target.value)}
+                    placeholder="如 E區, 原料區"
+                    className="w-full p-2 bg-white dark:bg-slate-700 border border-amber-500 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
-                  <datalist id="item-zone-datalist">
+                ) : (
+                  <select
+                    value={zone}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomZone(true);
+                      } else {
+                        handleZoneChange(e.target.value);
+                      }
+                    }}
+                    className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
                     {zoneList.map((z) => (
                       <option key={z.id} value={z.id}>
-                        {z.name || z.id}
+                        {z.id} {z.name && z.name !== z.id ? `(${z.name})` : ''}
                       </option>
                     ))}
-                  </datalist>
-                </div>
+                    {zone && !zoneList.some(z => z.id === zone) && (
+                      <option value={zone}>{zone} (自訂分區)</option>
+                    )}
+                    <option value="__custom__">✏️ 自訂新分區 (手動輸入)...</option>
+                  </select>
+                )}
               </div>
 
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">架號</label>
-                <select
-                  value={rack}
-                  onChange={(e) => setRack(e.target.value)}
-                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200"
-                >
-                  {availableRacks.length > 0 ? (
-                    availableRacks.map((r) => {
-                      const rCode = typeof r === 'string' ? r : r.code;
-                      const rName = typeof r === 'string' ? `${r}架` : `${r.code}架 (${r.name})`;
-                      return (
-                        <option key={rCode} value={rCode}>
-                          {rName}
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">架號</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomRack(!isCustomRack)}
+                    className="text-[10px] text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                  >
+                    {isCustomRack ? '切換下拉' : '手動輸入'}
+                  </button>
+                </div>
+                {isCustomRack ? (
+                  <input
+                    type="text"
+                    value={rack}
+                    onChange={(e) => setRack(e.target.value.replace(/架$/, ''))}
+                    placeholder="如 04, 05A"
+                    className="w-full p-2 bg-white dark:bg-slate-700 border border-amber-500 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                ) : (
+                  <select
+                    value={cleanRack}
+                    onChange={(e) => {
+                      if (e.target.value === '__custom__') {
+                        setIsCustomRack(true);
+                      } else {
+                        setRack(e.target.value);
+                      }
+                    }}
+                    className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  >
+                    {availableRacks.length > 0 && (
+                      <optgroup label="本區設定貨架">
+                        {availableRacks.map((r) => {
+                          const rCode = typeof r === 'string' ? r : r.code;
+                          const rName = typeof r === 'string' ? `${r}架` : `${r.code}架 (${r.name})`;
+                          return (
+                            <option key={`cfg-${rCode}`} value={rCode}>
+                              {rName}
+                            </option>
+                          );
+                        })}
+                      </optgroup>
+                    )}
+                    <optgroup label="常用架號 (01~08架)">
+                      {['01', '02', '03', '04', '05', '06', '07', '08'].map((rCode) => (
+                        <option key={`std-${rCode}`} value={rCode}>
+                          {rCode}架
                         </option>
-                      );
-                    })
-                  ) : (
-                    <option value={rack}>{rack}架</option>
-                  )}
-                </select>
+                      ))}
+                    </optgroup>
+                    {cleanRack && !['01', '02', '03', '04', '05', '06', '07', '08'].includes(cleanRack) && !availableRacks.some(r => (typeof r === 'string' ? r === cleanRack : r.code === cleanRack)) && (
+                      <option value={cleanRack}>{cleanRack}架 (目前位置)</option>
+                    )}
+                    <option value="__custom__">✏️ 自訂架號 (手動輸入)...</option>
+                  </select>
+                )}
               </div>
 
               <div>
