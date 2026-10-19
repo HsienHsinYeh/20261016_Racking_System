@@ -47,12 +47,20 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
   const [originalRackCode, setOriginalRackCode] = useState('');
   
   const [formZoneId, setFormZoneId] = useState('A區');
+  const [formZoneName, setFormZoneName] = useState('');
   const [formRackCode, setFormRackCode] = useState('');
   const [formRackName, setFormRackName] = useState('');
   const [formTierCount, setFormTierCount] = useState<number>(4);
   const [formBinsPerTier, setFormBinsPerTier] = useState<number>(4);
   const [formDescription, setFormDescription] = useState('');
   const [autoMigrateItems, setAutoMigrateItems] = useState(true);
+
+  // Zone Management States in List View
+  const [isAddingZone, setIsAddingZone] = useState(false);
+  const [newZoneInput, setNewZoneInput] = useState('');
+  const [isEditingZone, setIsEditingZone] = useState(false);
+  const [editZoneName, setEditZoneName] = useState('');
+  const [editZoneDesc, setEditZoneDesc] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +110,7 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
     setOriginalZoneId(zoneId);
     setOriginalRackCode('');
     setFormZoneId(zoneId);
+    setFormZoneName(targetZone?.name || zoneId);
     setFormRackCode(suggestedCode);
     setFormRackName(`${suggestedCode}號 多層儲存鋼架`);
     setFormTierCount(4);
@@ -115,10 +124,12 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
 
   // Start editing an existing rack
   const startEditRack = (zoneId: string, rack: ShelfRackConfig) => {
+    const targetZone = shelves.find(z => z.id === zoneId);
     setIsEditingExisting(true);
     setOriginalZoneId(zoneId);
     setOriginalRackCode(rack.code);
     setFormZoneId(zoneId);
+    setFormZoneName(targetZone?.name || zoneId);
     setFormRackCode(rack.code);
     setFormRackName(rack.name);
     setFormTierCount(rack.tierCount || 4);
@@ -130,14 +141,87 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
     setActiveTab('edit');
   };
 
+  // Add new zone directly from list view
+  const handleCreateNewZone = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = newZoneInput.trim();
+    if (!clean) return;
+    if (shelves.some(z => z.id.toLowerCase() === clean.toLowerCase())) {
+      setError(`分區【${clean}】已經存在！`);
+      return;
+    }
+
+    const newZone: ShelfZoneConfig = {
+      id: clean,
+      name: clean.includes('區') || clean.length > 3 ? clean : `${clean}區`,
+      desc: `自訂 ${clean} 倉庫立體多層鋼架分區`,
+      racks: []
+    };
+
+    const updated = [...shelves, newZone];
+    await onSaveShelves(updated);
+    setSelectedZoneId(clean);
+    setIsAddingZone(false);
+    setNewZoneInput('');
+    setSuccessMsg(`已成功新增分區【${clean}】！您可立即為該分區新增貨架。`);
+  };
+
+  // Edit current zone title / desc
+  const handleSaveCurrentZoneMeta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editZoneName.trim()) return;
+
+    const updated = shelves.map(z => {
+      if (z.id === currentZone.id) {
+        return {
+          ...z,
+          name: editZoneName.trim(),
+          desc: editZoneDesc.trim()
+        };
+      }
+      return z;
+    });
+
+    await onSaveShelves(updated);
+    setIsEditingZone(false);
+    setSuccessMsg(`分區【${currentZone.id}】名稱與說明已更新！`);
+  };
+
+  // Delete empty zone
+  const handleDeleteZone = async (zoneId: string) => {
+    const target = shelves.find(z => z.id === zoneId);
+    if (!target) return;
+    if (target.racks.length > 0) {
+      setError(`無法刪除分區【${zoneId}】，該分區下尚有 ${target.racks.length} 座貨架，請先將貨架刪除或調撥至其他分區。`);
+      return;
+    }
+    const zoneItems = items.filter(i => i.zone === zoneId || i.shelfLocation.startsWith(zoneId));
+    if (zoneItems.length > 0) {
+      setError(`無法刪除分區【${zoneId}】，系統中尚有 ${zoneItems.length} 項貨品指向此分區。`);
+      return;
+    }
+
+    if (window.confirm(`確定要刪除空分區【${target.name || zoneId}】嗎？`)) {
+      const updatedShelves = shelves.filter(z => z.id !== zoneId);
+      await onSaveShelves(updatedShelves);
+      setSelectedZoneId(updatedShelves[0]?.id || 'A區');
+      setSuccessMsg(`分區【${zoneId}】已成功刪除`);
+    }
+  };
+
   // Handle Save Rack
   const handleSaveRack = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
+    const cleanZone = formZoneId.trim();
     const cleanCode = formRackCode.trim();
     const cleanName = formRackName.trim();
 
+    if (!cleanZone) {
+      setError('請輸入或選擇所屬分區名稱 (例如: A區、E區、包裝區)');
+      return;
+    }
     if (!cleanCode) {
       setError('請填寫貨架編號 (如: 01, 02, 04)');
       return;
@@ -155,21 +239,18 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
       return;
     }
 
-    // Check duplicate rack code in the same zone
-    const targetZone = shelves.find(z => z.id === formZoneId);
-    if (!targetZone) {
-      setError(`找不到指定的分區：${formZoneId}`);
-      return;
-    }
+    // Check duplicate rack code in the same zone if zone exists
+    const existingZone = shelves.find(z => z.id.toLowerCase() === cleanZone.toLowerCase());
+    if (existingZone) {
+      const duplicateRack = existingZone.racks.find(
+        r => r.code.toLowerCase() === cleanCode.toLowerCase() && 
+        !(isEditingExisting && originalZoneId.toLowerCase() === cleanZone.toLowerCase() && originalRackCode.toLowerCase() === cleanCode.toLowerCase())
+      );
 
-    const duplicateRack = targetZone.racks.find(
-      r => r.code.toLowerCase() === cleanCode.toLowerCase() && 
-      !(isEditingExisting && originalZoneId === formZoneId && originalRackCode.toLowerCase() === cleanCode.toLowerCase())
-    );
-
-    if (duplicateRack) {
-      setError(`分區【${formZoneId}】已存在編號為【${cleanCode}】的貨架 (${duplicateRack.name})，請使用其他編號。`);
-      return;
+      if (duplicateRack) {
+        setError(`分區【${cleanZone}】已存在編號為【${cleanCode}】的貨架 (${duplicateRack.name})，請使用其他編號。`);
+        return;
+      }
     }
 
     // Check if reducing tiers would orphan items on the upper tiers
@@ -197,6 +278,20 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
       const updatedShelves = JSON.parse(JSON.stringify(shelves)) as ShelfZoneConfig[];
       let migrationConfig: any = undefined;
 
+      // Find or create target zone in updatedShelves
+      let destZone = updatedShelves.find(z => z.id.toLowerCase() === cleanZone.toLowerCase());
+      if (!destZone) {
+        destZone = {
+          id: cleanZone,
+          name: formZoneName.trim() || cleanZone,
+          desc: `自訂 ${cleanZone} 倉庫立體多層鋼架分區`,
+          racks: []
+        };
+        updatedShelves.push(destZone);
+      } else if (formZoneName && formZoneName.trim() !== destZone.name && formZoneName.trim() !== cleanZone) {
+        destZone.name = formZoneName.trim();
+      }
+
       if (isEditingExisting) {
         // Find and update existing
         const oldZone = updatedShelves.find(z => z.id === originalZoneId);
@@ -210,27 +305,25 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
               tierCount: formTierCount,
               binsPerTier: formBinsPerTier,
               description: formDescription.trim(),
-              zoneId: formZoneId,
+              zoneId: cleanZone,
             };
 
-            if (originalZoneId === formZoneId) {
+            if (originalZoneId === cleanZone) {
               oldZone.racks[rackIndex] = updatedRack;
             } else {
               // Moved to another zone
               oldZone.racks.splice(rackIndex, 1);
-              const newZone = updatedShelves.find(z => z.id === formZoneId);
-              if (newZone) {
-                newZone.racks.push(updatedRack);
-              }
+              destZone.racks.push(updatedRack);
+              destZone.racks.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
             }
 
             // Check if code or zone changed to prepare item migrations
-            if (autoMigrateItems && (originalZoneId !== formZoneId || originalRackCode !== cleanCode)) {
+            if (autoMigrateItems && (originalZoneId !== cleanZone || originalRackCode !== cleanCode)) {
               migrationConfig = {
                 fromLocationPrefix: `${originalZoneId}-${originalRackCode}架`,
-                toLocationPrefix: `${formZoneId}-${cleanCode}架`,
+                toLocationPrefix: `${cleanZone}-${cleanCode}架`,
                 oldZone: originalZoneId,
-                newZone: formZoneId,
+                newZone: cleanZone,
                 oldRack: originalRackCode,
                 newRack: cleanCode,
               };
@@ -240,8 +333,8 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
       } else {
         // Add new rack
         const newRack: ShelfRackConfig = {
-          id: `rack-${formZoneId.replace('區', '')}-${cleanCode}-${Date.now().toString(36)}`,
-          zoneId: formZoneId,
+          id: `rack-${cleanZone.replace('區', '')}-${cleanCode}-${Date.now().toString(36)}`,
+          zoneId: cleanZone,
           code: cleanCode,
           name: cleanName,
           tierCount: formTierCount,
@@ -249,19 +342,15 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
           description: formDescription.trim(),
         };
 
-        const target = updatedShelves.find(z => z.id === formZoneId);
-        if (target) {
-          target.racks.push(newRack);
-          // sort racks by code
-          target.racks.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
-        }
+        destZone.racks.push(newRack);
+        destZone.racks.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
       }
 
       await onSaveShelves(updatedShelves, migrationConfig);
       setSuccessMsg(isEditingExisting ? `貨架【${cleanName}】更新成功！` : `新貨架【${cleanName}】新增成功！`);
       setTimeout(() => {
         setActiveTab('list');
-        setSelectedZoneId(formZoneId);
+        setSelectedZoneId(cleanZone);
         setSuccessMsg(null);
       }, 800);
     } catch (err: any) {
@@ -418,21 +507,23 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
           {/* TAB 1: LIST VIEW */}
           {activeTab === 'list' && (
             <div className="space-y-5">
-              {/* Zone Filter Chips */}
-              <div className="flex flex-wrap gap-2">
+              {/* Zone Filter Chips & Add Zone */}
+              <div className="flex flex-wrap items-center gap-2">
                 {shelves.map((zone) => {
                   const isSelected = selectedZoneId === zone.id;
                   const rackCount = zone.racks?.length || 0;
-                  const totalSlots = (zone.racks || []).reduce((acc, r) => acc + (r.tierCount * (r.binsPerTier || 4)), 0);
                   const zoneItemsCount = items.filter(i => i.zone === zone.id || i.shelfLocation.startsWith(zone.id)).length;
 
                   return (
                     <button
                       key={zone.id}
-                      onClick={() => setSelectedZoneId(zone.id)}
+                      onClick={() => {
+                        setSelectedZoneId(zone.id);
+                        setIsEditingZone(false);
+                      }}
                       className={`px-3.5 py-2 rounded-xl text-sm font-semibold border transition-all cursor-pointer flex items-center gap-2 ${
                         isSelected
-                          ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 text-amber-900 dark:text-amber-200 shadow-sm'
+                          ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 text-amber-900 dark:text-amber-200 shadow-sm ring-1 ring-amber-500'
                           : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                       }`}
                     >
@@ -443,20 +534,118 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
                     </button>
                   );
                 })}
+
+                {/* Add New Zone Button / Input Form */}
+                {!isAddingZone ? (
+                  <button
+                    onClick={() => {
+                      setIsAddingZone(true);
+                      setNewZoneInput('');
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-bold border border-dashed border-amber-500/60 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 flex items-center gap-1 transition-all cursor-pointer"
+                    title="新增自訂分區"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>新增分區</span>
+                  </button>
+                ) : (
+                  <form onSubmit={handleCreateNewZone} className="flex items-center gap-1.5 animate-in fade-in">
+                    <input
+                      type="text"
+                      autoFocus
+                      required
+                      placeholder="輸入分區名稱 (例: E區)"
+                      value={newZoneInput}
+                      onChange={(e) => setNewZoneInput(e.target.value)}
+                      className="px-3 py-1.5 text-xs bg-white dark:bg-slate-800 border border-amber-500 rounded-xl focus:outline-none focus:ring-1 focus:ring-amber-500 font-bold"
+                    />
+                    <button
+                      type="submit"
+                      className="px-2.5 py-1.5 bg-amber-500 text-slate-950 font-bold text-xs rounded-xl hover:bg-amber-400 cursor-pointer"
+                    >
+                      確定
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingZone(false)}
+                      className="p-1.5 text-slate-400 hover:text-slate-200 text-xs cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </form>
+                )}
               </div>
 
               {/* Zone Details & Racks Card Grid */}
               <div className="bg-slate-50 dark:bg-slate-800/30 rounded-2xl p-4 border border-slate-200/80 dark:border-slate-800">
-                <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-200 dark:border-slate-700">
-                  <div>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                      {currentZone.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      {currentZone.desc}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-lg font-medium">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-200 dark:border-slate-700">
+                  {!isEditingZone ? (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                          {currentZone.name || currentZone.id}
+                        </h3>
+                        <button
+                          onClick={() => {
+                            setEditZoneName(currentZone.name || currentZone.id);
+                            setEditZoneDesc(currentZone.desc || '');
+                            setIsEditingZone(true);
+                          }}
+                          className="p-1 text-slate-400 hover:text-amber-500 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                          title="修改分區名稱與描述"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        {currentZone.racks.length === 0 && (
+                          <button
+                            onClick={() => handleDeleteZone(currentZone.id)}
+                            className="p-1 text-slate-400 hover:text-rose-500 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                            title="刪除此無貨架分區"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        {currentZone.desc || '暫無描述說明'}
+                      </p>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSaveCurrentZoneMeta} className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          required
+                          value={editZoneName}
+                          onChange={(e) => setEditZoneName(e.target.value)}
+                          placeholder="分區完整名稱 (如: A區 - 機電傳動配件)"
+                          className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-amber-500 rounded-xl font-bold text-slate-900 dark:text-white"
+                        />
+                        <button
+                          type="submit"
+                          className="px-3 py-1.5 bg-amber-500 text-slate-950 font-bold text-xs rounded-xl hover:bg-amber-400 cursor-pointer"
+                        >
+                          儲存
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingZone(false)}
+                          className="px-2 py-1.5 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
+                        >
+                          取消
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={editZoneDesc}
+                        onChange={(e) => setEditZoneDesc(e.target.value)}
+                        placeholder="分區備註說明 (如: 步進馬達、斜齒輪箱、傳動皮帶)"
+                        className="w-full px-3 py-1 text-[11px] bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200"
+                      />
+                    </form>
+                  )}
+
+                  <span className="text-xs px-2.5 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-lg font-medium self-start sm:self-auto shrink-0">
                     共 {currentZone.racks.length} 座立體貨架
                   </span>
                 </div>
@@ -611,22 +800,79 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Zone Select */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1.5">
-                    所屬分區 (Zone) <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={formZoneId}
-                    onChange={(e) => setFormZoneId(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
-                  >
+                {/* Zone Direct Input with Datalist & Quick Chips */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
+                      所屬分區 (Zone) <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                      可直接自行輸入分區名稱
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      list="shelf-zones-datalist"
+                      placeholder="直接輸入分區名稱 (例: A區, E區, 包裝專區)"
+                      value={formZoneId}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormZoneId(val);
+                        const matched = shelves.find(z => z.id.toLowerCase() === val.trim().toLowerCase());
+                        if (matched) {
+                          setFormZoneName(matched.name);
+                        } else {
+                          setFormZoneName(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <datalist id="shelf-zones-datalist">
+                      {shelves.map((z) => (
+                        <option key={z.id} value={z.id}>
+                          {z.name}
+                        </option>
+                      ))}
+                    </datalist>
+                  </div>
+
+                  {/* Quick Pick Chips of Existing Zones */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <span className="text-[10px] text-slate-400">快速帶入既有分區：</span>
                     {shelves.map((z) => (
-                      <option key={z.id} value={z.id}>
-                        {z.name} ({z.id})
-                      </option>
+                      <button
+                        key={z.id}
+                        type="button"
+                        onClick={() => {
+                          setFormZoneId(z.id);
+                          setFormZoneName(z.name);
+                        }}
+                        className={`text-[11px] px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                          formZoneId.trim() === z.id
+                            ? 'bg-amber-500 text-slate-950 font-bold border-amber-500'
+                            : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-amber-400'
+                        }`}
+                      >
+                        {z.id}
+                      </button>
                     ))}
-                  </select>
+                  </div>
+
+                  {/* Prompt when a new zone is typed */}
+                  {formZoneId && !shelves.some(z => z.id.toLowerCase() === formZoneId.trim().toLowerCase()) && (
+                    <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-xl text-xs space-y-1 animate-in fade-in">
+                      <div className="flex items-center gap-1 text-amber-800 dark:text-amber-300 font-bold">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>新自訂分區：【{formZoneId}】</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        系統將自動為您新增此分區並建立貨架矩陣。
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Rack Code */}

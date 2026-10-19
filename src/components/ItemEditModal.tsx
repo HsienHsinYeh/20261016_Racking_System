@@ -389,18 +389,24 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
 
             <div className="grid grid-cols-4 gap-2">
               <div>
-                <label className="block text-[11px] text-slate-400 mb-1">區域</label>
-                <select
-                  value={zone}
-                  onChange={(e) => handleZoneChange(e.target.value)}
-                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200"
-                >
-                  {zoneList.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.name || z.id}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-[11px] text-slate-400 mb-1">區域 (分區)</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    list="item-zone-datalist"
+                    value={zone}
+                    onChange={(e) => handleZoneChange(e.target.value)}
+                    placeholder="分區 (如 A區, E區)"
+                    className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200"
+                  />
+                  <datalist id="item-zone-datalist">
+                    {zoneList.map((z) => (
+                      <option key={z.id} value={z.id}>
+                        {z.name || z.id}
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
               </div>
 
               <div>
