@@ -452,26 +452,6 @@ export default function App() {
     }
   };
 
-  // Reset demo seed
-  const handleResetSeed = async () => {
-    if (!userPermissions.canManageAccounts) {
-      addToast({
-        title: '⚠️ 權限不足',
-        message: '重置預設示範資料僅限系統管理員操作。',
-        type: 'warning'
-      });
-      return;
-    }
-    if (window.confirm('確定要將貨架庫存重置為預設示範資料嗎？')) {
-      await realtimeClient.resetSeedData();
-      addToast({
-        title: '🔄 資料已重置',
-        message: '已恢復為賢欣工業工廠標準貨架庫存示範資料',
-        type: 'info'
-      });
-    }
-  };
-
   // Save dynamic shelves configuration
   const handleSaveShelves = async (
     updatedShelves: ShelfZoneConfig[],
@@ -613,7 +593,6 @@ export default function App() {
           setShelfModalTarget(undefined);
           setIsShelfModalOpen(true);
         }}
-        onResetSeed={handleResetSeed}
         onOpenChatbot={() => setIsChatbotOpen(prev => !prev)}
         onOpenSwitchAccount={() => setIsSwitchAccountOpen(true)}
         activeView={activeView}

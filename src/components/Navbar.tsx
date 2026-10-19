@@ -7,7 +7,6 @@ import {
   Plus, 
   Bell, 
   Users, 
-  RotateCcw,
   Printer,
   ChevronDown,
   Warehouse,
@@ -39,7 +38,6 @@ interface NavbarProps {
   onOpenAlerts: () => void;
   onOpenAccountManagement: () => void;
   onOpenShelfManagement?: () => void;
-  onResetSeed: () => void;
   onOpenChatbot: () => void;
   onOpenSwitchAccount?: () => void;
   activeView: 'list' | 'shelf_map' | 'audit';
@@ -63,7 +61,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAlerts,
   onOpenAccountManagement,
   onOpenShelfManagement,
-  onResetSeed,
   onOpenChatbot,
   onOpenSwitchAccount,
   activeView,
@@ -303,19 +300,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     )}
 
-                    {isAdmin && (
-                      <button
-                        onClick={() => {
-                          setShowUserDropdown(false);
-                          onResetSeed();
-                        }}
-                        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>重設預設示範貨品資料</span>
-                      </button>
-                    )}
-
                     {/* Authenticated Switch Account */}
                     <button
                       onClick={() => {
@@ -503,19 +487,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <UserCheck className="w-3.5 h-3.5 text-amber-400" />
                 <span>切換帳號 (需驗證密碼)</span>
               </button>
-
-              {isAdmin && (
-                <button
-                  onClick={() => {
-                    setShowMobileMenu(false);
-                    onResetSeed();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-2 text-xs text-slate-400 hover:text-amber-300 bg-slate-800/40 rounded-xl cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>重設預設示範貨品資料</span>
-                </button>
-              )}
 
               <button
                 onClick={() => {

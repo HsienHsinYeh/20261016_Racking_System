@@ -1313,17 +1313,6 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
     }
   });
 
-  // 9. Reset seed data if needed
-  app.post('/api/reset-seed', (req, res) => {
-    saveItems(SEED_ITEMS);
-    broadcast('init', {
-      items: SEED_ITEMS,
-      alerts: generateAlerts(SEED_ITEMS),
-      onlineCount: clients.size
-    });
-    res.json({ success: true, message: '已重置為賢欣工廠預設示範貨品資料' });
-  });
-
   // Mount Vite middleware in development or serve static in production
   const isProduction = process.env.NODE_ENV === 'production';
   if (!isProduction) {

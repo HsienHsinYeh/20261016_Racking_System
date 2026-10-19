@@ -207,11 +207,6 @@ class RealtimeInventoryClient {
     return data.operators || [];
   }
 
-  public async resetSeedData(): Promise<void> {
-    const res = await fetch('/api/reset-seed', { method: 'POST' });
-    if (!res.ok) throw new Error('重置失敗');
-  }
-
   public async login(username: string, password: string): Promise<AuthUser> {
     const res = await fetch('/api/auth/login', {
       method: 'POST',

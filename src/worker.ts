@@ -800,12 +800,6 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
           return jsonResponse({ success: true, shelves });
         }
 
-        // Reset seed
-        if (path === '/api/reset-seed' && method === 'POST') {
-          await saveItems(env, [...SEED_ITEMS]);
-          return jsonResponse({ success: true, message: '已重置為賢欣工廠預設示範貨品資料' });
-        }
-
         return errorResponse('API endpoint not found', 404);
       } catch (err: any) {
         return errorResponse(err.message || 'Internal server error', 500);
