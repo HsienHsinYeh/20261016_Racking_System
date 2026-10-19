@@ -28,7 +28,8 @@ export const QrCodePrintCenter: React.FC<QrCodePrintCenterProps> = ({
 }) => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [qrCodeMap, setQrCodeMap] = useState<Record<string, string>>({});
-  const [labelSize, setLabelSize] = useState<'standard' | 'large' | 'compact'>('standard');
+  const [labelSize, setLabelSize] = useState<'standard' | 'large' | 'compact' | 'card'>('standard');
+  const [layoutMode, setLayoutMode] = useState<'grid2' | 'single'>('grid2');
   const [generating, setGenerating] = useState(false);
 
   // Initialize selected
@@ -85,7 +86,7 @@ export const QrCodePrintCenter: React.FC<QrCodePrintCenterProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh]">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
           <div className="flex items-center gap-2.5">
@@ -93,11 +94,14 @@ export const QrCodePrintCenter: React.FC<QrCodePrintCenterProps> = ({
               <Printer className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-lg text-slate-900 dark:text-white">
-                貨架與貨品 QR Code 標籤生成與列印中心
+              <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                <span>貨架與貨品 QR Code 標籤列印中心</span>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  橫式 3:5 規範
+                </span>
               </h3>
               <p className="text-xs text-slate-400">
-                可黏貼於倉庫貨架槽位或貨品外箱，掃描即可自動定位調閱
+                所有標籤均採用標準橫式 3:5 比例，可黏貼於貨架儲位槽或貨品外箱
               </p>
             </div>
           </div>
@@ -124,18 +128,33 @@ export const QrCodePrintCenter: React.FC<QrCodePrintCenterProps> = ({
             </span>
           </div>
 
-          {/* Label Template Selector */}
-          <div className="flex items-center gap-2">
-            <span className="text-slate-400">標籤貼紙規格：</span>
-            <select
-              value={labelSize}
-              onChange={(e) => setLabelSize(e.target.value as any)}
-              className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
-            >
-              <option value="standard">標準工業標籤 (70mm × 45mm)</option>
-              <option value="large">大型貨架外箱標籤 (100mm × 65mm)</option>
-              <option value="compact">緊湊條碼貼紙 (50mm × 30mm)</option>
-            </select>
+          {/* Label Template & Layout Selectors */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">標籤規格 (全橫式 3:5)：</span>
+              <select
+                value={labelSize}
+                onChange={(e) => setLabelSize(e.target.value as any)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
+              >
+                <option value="standard">標準物料標籤 (75mm × 45mm • 橫式 3:5)</option>
+                <option value="large">大型外箱標籤 (100mm × 60mm • 橫式 3:5)</option>
+                <option value="compact">小型儲位貼紙 (50mm × 30mm • 橫式 3:5)</option>
+                <option value="card">標準標籤卡片 (125mm × 75mm • 橫式 3:5)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400">列印版面：</span>
+              <select
+                value={layoutMode}
+                onChange={(e) => setLayoutMode(e.target.value as any)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
+              >
+                <option value="grid2">A4 雙排標籤 (橫向 2 欄)</option>
+                <option value="single">條碼捲紙機 (單張連續進紙)</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -190,17 +209,22 @@ export const QrCodePrintCenter: React.FC<QrCodePrintCenterProps> = ({
             </div>
 
             {/* Labels Grid */}
-            <div id="printable-labels-container" className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div 
+              id="printable-labels-container" 
+              className={layoutMode === 'grid2' ? 'layout-grid2 grid grid-cols-1 sm:grid-cols-2 gap-4' : 'layout-single flex flex-col items-center gap-4'}
+            >
               {printableItems.map((item) => {
                 const qrUrl = qrCodeMap[item.id];
 
                 return (
                   <div
                     key={item.id}
-                    className="warehouse-label bg-white text-slate-950 border-2 border-slate-900 rounded-2xl p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden"
+                    className={`warehouse-label bg-white text-slate-950 border-2 border-slate-900 rounded-2xl p-3 sm:p-3.5 shadow-sm flex flex-col justify-between relative overflow-hidden aspect-[5/3] ${
+                      layoutMode === 'single' ? 'w-full max-w-[420px]' : 'w-full'
+                    }`}
                   >
                     {/* Brand Banner */}
-                    <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1.5 mb-2">
+                    <div className="flex items-center justify-between border-b-2 border-slate-900 pb-1 mb-1.5">
                       <div className="flex items-center gap-1.5">
                         <span className="w-3.5 h-3.5 rounded bg-slate-900 flex items-center justify-center text-white text-[9px] font-black">
                           賢
@@ -209,27 +233,27 @@ export const QrCodePrintCenter: React.FC<QrCodePrintCenterProps> = ({
                           賢欣工業 • 貨架物料標籤
                         </span>
                       </div>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-100 rounded border border-slate-300">
-                        WMS PRO
+                      <span className="text-[9px] font-bold px-1.5 py-0.2 bg-slate-100 rounded border border-slate-300 text-slate-700">
+                        橫式 3:5
                       </span>
                     </div>
 
                     {/* Main Label Body: QR Code + Item Data */}
-                    <div className="flex gap-3 items-center">
+                    <div className="flex gap-2.5 sm:gap-3 items-center flex-1 min-h-0">
                       {/* QR Code */}
-                      <div className="shrink-0 p-1 border border-slate-300 rounded-lg bg-white">
+                      <div className="shrink-0 p-1 border border-slate-300 rounded-lg bg-white flex items-center justify-center">
                         {qrUrl ? (
-                          <img src={qrUrl} alt="QR Code" className="w-20 h-20" />
+                          <img src={qrUrl} alt="QR Code" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
                         ) : (
-                          <div className="w-20 h-20 bg-slate-100 animate-pulse rounded" />
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 animate-pulse rounded" />
                         )}
                       </div>
 
                       {/* Details */}
-                      <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex-1 min-w-0 space-y-0.5 sm:space-y-1">
                         <div>
                           <span className="text-[9px] text-slate-500 uppercase font-semibold">貨號 (SKU)</span>
-                          <div className="font-mono text-base font-black tracking-tight leading-none text-slate-900">
+                          <div className="font-mono text-sm sm:text-base font-black tracking-tight leading-tight text-slate-900 truncate">
                             {item.sku}
                           </div>
                         </div>
@@ -249,17 +273,17 @@ export const QrCodePrintCenter: React.FC<QrCodePrintCenterProps> = ({
                     </div>
 
                     {/* Shelf Location Highlight Footer */}
-                    <div className="mt-2.5 pt-2 border-t-2 border-slate-900 flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200">
+                    <div className="mt-1 pt-1 border-t-2 border-slate-900 flex items-center justify-between bg-slate-50 px-2 py-1 sm:py-1.5 rounded-xl border border-slate-200">
                       <div>
-                        <div className="text-[9px] font-bold text-slate-500 uppercase">指定貨架儲位</div>
-                        <div className="font-mono text-sm font-black text-slate-950 flex items-center gap-1">
+                        <div className="text-[8px] font-bold text-slate-500 uppercase">指定貨架儲位</div>
+                        <div className="font-mono text-xs sm:text-sm font-black text-slate-950 flex items-center gap-1">
                           <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span>{item.shelfLocation}</span>
+                          <span className="truncate">{item.shelfLocation}</span>
                         </div>
                       </div>
 
                       <div className="text-right">
-                        <div className="text-[9px] font-bold text-slate-500">標準備料</div>
+                        <div className="text-[8px] font-bold text-slate-500">標準備料</div>
                         <div className="font-bold text-xs">
                           {item.minSafeQuantity} {item.unit}
                         </div>
