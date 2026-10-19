@@ -53,6 +53,9 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Dynamic zones list
+  const availableZones = ['ALL', ...Array.from(new Set(items.map(i => i.zone).filter(Boolean)))];
+
   // Filter items
   const filteredItems = items.filter((item) => {
     // Search match
@@ -183,13 +186,13 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
         {/* Filter Badges & Sort Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
           {/* Zone Selector */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none flex-nowrap max-w-full">
             <span className="text-slate-400 font-medium whitespace-nowrap">庫存區域：</span>
-            {['ALL', 'A區', 'B區', 'C區', 'D區'].map((z) => (
+            {availableZones.map((z) => (
               <button
                 key={z}
                 onClick={() => setSelectedZone(z)}
-                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                   selectedZone === z
                     ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -302,12 +305,11 @@ export const InventoryTable: React.FC<InventoryTableProps> = ({
                     </div>
                   </div>
 
-                  {/* Main Product Info: Photo + Name + Finished Product */}
-                  <div className="flex gap-3 mb-3">
+                  <div className="flex gap-2.5 sm:gap-3 mb-3">
                     <img
                       src={item.photo}
                       alt={item.name}
-                      className="w-20 h-20 object-cover rounded-xl border border-slate-200 dark:border-slate-800 shrink-0 bg-slate-100"
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border border-slate-200 dark:border-slate-800 shrink-0 bg-slate-100"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = 'none';
                       }}

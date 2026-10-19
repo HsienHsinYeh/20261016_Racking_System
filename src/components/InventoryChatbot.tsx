@@ -473,28 +473,28 @@ export const InventoryChatbot: React.FC<InventoryChatbotProps> = ({
   return (
     <>
       {/* Floating Launcher Button */}
-      <div className="fixed bottom-5 right-5 z-40 select-none">
+      <div className="fixed bottom-16 sm:bottom-5 right-4 sm:right-5 z-40 select-none">
         <button
           onClick={onToggle}
           aria-label="打開智能庫存助理"
-          className={`group flex items-center gap-2.5 px-4 py-3 rounded-full shadow-2xl transition-all duration-300 transform active:scale-95 ${
+          className={`group flex items-center gap-2 p-2.5 sm:px-4 sm:py-3 rounded-full shadow-2xl transition-all duration-300 transform active:scale-95 ${
             isOpen
               ? 'bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700'
               : 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 font-semibold hover:shadow-amber-500/30 hover:scale-105'
           }`}
         >
           <div className="relative">
-            <Bot className={`w-6 h-6 ${isOpen ? 'text-amber-400' : 'text-slate-950'} transition-transform group-hover:rotate-6`} />
+            <Bot className={`w-5 h-5 sm:w-6 sm:h-6 ${isOpen ? 'text-amber-400' : 'text-slate-950'} transition-transform group-hover:rotate-6`} />
             <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
           </div>
-          <span className="text-sm tracking-wide hidden sm:inline">
+          <span className="text-xs sm:text-sm tracking-wide hidden sm:inline font-bold">
             {isOpen ? '收合 AI 助理' : '賢欣 AI 庫存助理'}
           </span>
           {!isOpen && alerts.length > 0 && (
-            <span className="px-1.5 py-0.5 text-xs font-bold bg-rose-600 text-white rounded-full">
+            <span className="px-1.5 py-0.2 sm:py-0.5 text-[10px] sm:text-xs font-bold bg-rose-600 text-white rounded-full">
               {alerts.length}
             </span>
           )}
@@ -503,7 +503,7 @@ export const InventoryChatbot: React.FC<InventoryChatbotProps> = ({
 
       {/* Chat Window Panel */}
       {isOpen && (
-        <div className="fixed bottom-20 right-4 sm:right-6 z-50 w-[94vw] sm:w-[440px] h-[580px] max-h-[82vh] bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-bottom-6 duration-200">
+        <div className="fixed inset-x-2 bottom-16 sm:bottom-20 sm:right-6 sm:inset-x-auto sm:w-[440px] h-[78vh] sm:h-[580px] max-h-[85vh] z-50 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-xl animate-in fade-in slide-in-from-bottom-6 duration-200">
           
           {/* Header */}
           <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border-b border-slate-700/70 p-3.5 flex items-center justify-between text-white">

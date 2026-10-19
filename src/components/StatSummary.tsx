@@ -73,8 +73,8 @@ export const StatSummary: React.FC<StatSummaryProps> = ({
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3.5 mb-5">
-      {cards.map((card) => {
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3.5 mb-4 sm:mb-5">
+      {cards.map((card, idx) => {
         const Icon = card.icon;
         const isSelected = selectedFilter === card.id;
 
@@ -82,9 +82,9 @@ export const StatSummary: React.FC<StatSummaryProps> = ({
           <button
             key={card.id}
             onClick={() => onSelectFilter(isSelected ? 'all' : card.id)}
-            className={`p-3 sm:p-4 rounded-xl border text-left transition-all relative overflow-hidden cursor-pointer active:scale-98 ${card.color} ${
+            className={`p-2.5 sm:p-4 rounded-xl border text-left transition-all relative overflow-hidden cursor-pointer active:scale-98 ${card.color} ${
               isSelected ? 'ring-2 ring-amber-500 shadow-md translate-y-[-2px]' : 'hover:shadow-sm'
-            }`}
+            } ${idx === 0 ? 'col-span-2 sm:col-span-1' : ''}`}
           >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">

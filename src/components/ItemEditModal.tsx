@@ -421,7 +421,7 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-2">
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">區域 (分區)</label>
