@@ -427,18 +427,31 @@ function ensureDataDir() {
   }
 }
 
+function normalizeUserRole(role: string, username?: string): string {
+  if (username?.toLowerCase() === 'admin') return '系統管理員';
+  if (!role) return '一盤層級';
+  if (role === '系統管理員' || role.includes('最高主管') || role.includes('系統主管')) return '系統管理員';
+  if (role === '資料管理層級' || role.includes('課長') || role.includes('組長') || role.includes('專員') || role.includes('倉管員')) return '資料管理層級';
+  if (role === '一盤層級') return '一盤層級';
+  return '一盤層級';
+}
+
 function loadUsers(): UserAccount[] {
   try {
     ensureDataDir();
+    let users = USER_ACCOUNTS;
     if (fs.existsSync(USERS_FILE)) {
       const raw = fs.readFileSync(USERS_FILE, 'utf-8');
       const data = JSON.parse(raw);
       if (Array.isArray(data) && data.length > 0) {
-        return data;
+        users = data;
       }
     }
-    saveUsers(USER_ACCOUNTS);
-    return USER_ACCOUNTS;
+    return users.map((u) => ({
+      ...u,
+      role: normalizeUserRole(u.role, u.username),
+      name: u.username?.toLowerCase() === 'admin' && (u.name === '系統管理員 (主管)' || !u.name) ? '系統管理員' : u.name
+    }));
   } catch (err) {
     console.error('Error loading users file:', err);
     return USER_ACCOUNTS;
@@ -823,7 +836,7 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
         username: cleanUsername,
         passwordHash: String(password).trim(),
         name: String(name).trim(),
-        role: String(role || '倉管人員').trim(),
+        role: normalizeUserRole(role, cleanUsername),
         avatar: String(avatar || '👨‍🔧').trim(),
         department: String(department || '倉儲物流部').trim(),
       };
@@ -871,16 +884,20 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
       const { name, role, department, avatar, password, username } = req.body || {};
 
       // Safety protection for primary admin account
-      if (existing.username === 'admin') {
+      if (existing.username.toLowerCase() === 'admin') {
         if (username && username.toLowerCase() !== 'admin') {
           return res.status(400).json({ error: '不可修改系統最高管理員 admin 的帳號名稱' });
         }
       }
 
+      const targetRole = existing.username.toLowerCase() === 'admin'
+        ? '系統管理員'
+        : (role ? normalizeUserRole(role, existing.username) : existing.role);
+
       const updatedAccount: UserAccount = {
         ...existing,
         name: name ? String(name).trim() : existing.name,
-        role: role ? String(role).trim() : existing.role,
+        role: targetRole,
         department: department ? String(department).trim() : existing.department,
         avatar: avatar ? String(avatar).trim() : existing.avatar,
         passwordHash: password && String(password).trim().length > 0 ? String(password).trim() : existing.passwordHash,

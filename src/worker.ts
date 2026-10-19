@@ -63,19 +63,33 @@ async function saveItems(env: Env, items: InventoryItem[]): Promise<void> {
   }
 }
 
+function normalizeUserRole(role: string, username: string): string {
+  if (username?.toLowerCase() === 'admin') return '系統管理員';
+  if (!role) return '一盤層級';
+  if (role === '系統管理員' || role.includes('最高主管') || role.includes('系統主管')) return '系統管理員';
+  if (role === '資料管理層級' || role.includes('課長') || role.includes('組長') || role.includes('專員') || role.includes('倉管員')) return '資料管理層級';
+  if (role === '一盤層級') return '一盤層級';
+  return '一盤層級';
+}
+
 async function getUsers(env: Env): Promise<any[]> {
+  let list = USER_ACCOUNTS;
   if (env.INVENTORY_KV) {
     try {
       const raw = await env.INVENTORY_KV.get('user_accounts');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) list = parsed;
       }
     } catch (err) {
       console.warn('Error reading users from KV:', err);
     }
   }
-  return [...USER_ACCOUNTS];
+  return list.map((u: any) => ({
+    ...u,
+    role: normalizeUserRole(u.role, u.username),
+    name: u.username?.toLowerCase() === 'admin' && (u.name === '系統管理員 (主管)' || !u.name) ? '系統管理員' : u.name
+  }));
 }
 
 async function saveUsers(env: Env, users: any[]): Promise<void> {
@@ -394,7 +408,7 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
             username: cleanUsername,
             passwordHash: String(password).trim(),
             name: String(name).trim(),
-            role: String(role || '倉管人員').trim(),
+            role: normalizeUserRole(role, cleanUsername),
             avatar: String(avatar || '👨‍🔧').trim(),
             department: String(department || '倉儲物流部').trim(),
           };
@@ -428,14 +442,18 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
           const body: any = await request.json().catch(() => ({}));
           const { name, role, department, avatar, password, username } = body;
 
-          if (existing.username === 'admin' && username && username.toLowerCase() !== 'admin') {
+          if (existing.username.toLowerCase() === 'admin' && username && username.toLowerCase() !== 'admin') {
             return errorResponse('不可修改系統最高管理員 admin 的帳號名稱', 400);
           }
+
+          const targetRole = existing.username.toLowerCase() === 'admin'
+            ? '系統管理員'
+            : (role ? normalizeUserRole(role, existing.username) : existing.role);
 
           const updatedAccount = {
             ...existing,
             name: name ? String(name).trim() : existing.name,
-            role: role ? String(role).trim() : existing.role,
+            role: targetRole,
             department: department ? String(department).trim() : existing.department,
             avatar: avatar ? String(avatar).trim() : existing.avatar,
             passwordHash:

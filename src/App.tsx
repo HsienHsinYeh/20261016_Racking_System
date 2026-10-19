@@ -23,6 +23,7 @@ import { AccountManagementModal } from './components/AccountManagementModal';
 import { InventoryChatbot } from './components/InventoryChatbot';
 import { ShelfManagementModal } from './components/ShelfManagementModal';
 import { playSound } from './utils/sound';
+import { getUserPermissions } from './utils/permissions';
 import { 
   InventoryItem, 
   SystemAlert, 
@@ -36,7 +37,7 @@ import {
 const DEFAULT_OPERATOR: Operator = {
   id: 'op-1',
   name: '陳建良',
-  role: 'A/B區資深倉管員',
+  role: '資料管理層級',
   avatar: '👨‍🔧',
   department: '倉儲物流部'
 };
@@ -51,6 +52,12 @@ export default function App() {
     return null;
   });
   const [authChecking, setAuthChecking] = useState<boolean>(true);
+
+  // Compute permissions based on logged-in user or active operator
+  const userPermissions = getUserPermissions(
+    currentUser?.role || DEFAULT_OPERATOR.role,
+    currentUser?.username
+  );
 
   // State
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -328,6 +335,14 @@ export default function App() {
 
   // Save Item (Create or Edit)
   const handleSaveItem = async (itemData: Partial<InventoryItem>, editNote?: string) => {
+    if (!userPermissions.canModifyData) {
+      addToast({
+        title: '⚠️ 權限不足',
+        message: '一盤層級僅具備查閱與掃碼功能，不得新增或修改料件。',
+        type: 'warning'
+      });
+      return;
+    }
     if (editingItem) {
       await realtimeClient.updateItem(editingItem.id, itemData, currentOperator.name, editNote);
     } else {
@@ -337,12 +352,28 @@ export default function App() {
 
   // Quick stock adjust
   const handleQuickAdjust = async (item: InventoryItem, delta: number) => {
+    if (!userPermissions.canModifyData) {
+      addToast({
+        title: '⚠️ 權限不足',
+        message: '一盤層級僅具備查閱與掃碼功能，不得調整庫存。',
+        type: 'warning'
+      });
+      return;
+    }
     const reason = delta > 0 ? `快捷入庫 +${delta} ${item.unit}` : `快捷出庫 ${delta} ${item.unit}`;
     await realtimeClient.adjustStock(item.id, delta, currentOperator.name, reason);
   };
 
   // Stock drawer adjustment
   const handleDrawerAdjust = async (item: InventoryItem, delta: number, reason: string) => {
+    if (!userPermissions.canModifyData) {
+      addToast({
+        title: '⚠️ 權限不足',
+        message: '一盤層級僅具備查閱與掃碼功能，不得調整庫存。',
+        type: 'warning'
+      });
+      return;
+    }
     await realtimeClient.adjustStock(item.id, delta, currentOperator.name, reason);
   };
 
@@ -353,11 +384,27 @@ export default function App() {
     adjustSystemQty: boolean, 
     note?: string
   ) => {
+    if (!userPermissions.canAuditStock) {
+      addToast({
+        title: '⚠️ 權限不足',
+        message: '一盤層級僅具備查閱與掃碼功能，不得提交盤點資料。',
+        type: 'warning'
+      });
+      return;
+    }
     await realtimeClient.auditCount(itemId, countedQty, currentOperator.name, adjustSystemQty, note);
   };
 
   // Delete item
   const handleDeleteItem = async (item: InventoryItem) => {
+    if (!userPermissions.canModifyData) {
+      addToast({
+        title: '⚠️ 權限不足',
+        message: '一盤層級僅具備查閱與掃碼功能，不得刪除料件。',
+        type: 'warning'
+      });
+      return;
+    }
     if (window.confirm(`確定要自貨架系統中移除【${item.name} (${item.sku})】嗎？此動作將同步通知所有連線人員。`)) {
       await realtimeClient.deleteItem(item.id);
     }
@@ -365,6 +412,14 @@ export default function App() {
 
   // Reset demo seed
   const handleResetSeed = async () => {
+    if (!userPermissions.canManageAccounts) {
+      addToast({
+        title: '⚠️ 權限不足',
+        message: '重置預設示範資料僅限系統管理員操作。',
+        type: 'warning'
+      });
+      return;
+    }
     if (window.confirm('確定要將貨架庫存重置為預設示範資料嗎？')) {
       await realtimeClient.resetSeedData();
       addToast({
@@ -380,6 +435,14 @@ export default function App() {
     updatedShelves: ShelfZoneConfig[],
     migratedItems?: { originalLocationPrefix: string; newLocationPrefix: string }[]
   ) => {
+    if (!userPermissions.canManageShelves) {
+      addToast({
+        title: '⚠️ 權限不足',
+        message: '一盤層級無權編輯貨架結構與層數設定。',
+        type: 'warning'
+      });
+      return;
+    }
     try {
       setShelves(updatedShelves);
       localStorage.setItem('hh_wms_shelves', JSON.stringify(updatedShelves));
@@ -550,6 +613,8 @@ export default function App() {
               setPrintItemsList(selectedList);
               setIsPrintCenterOpen(true);
             }}
+            canModifyData={userPermissions.canModifyData}
+            canAuditStock={userPermissions.canAuditStock}
           />
         )}
 
@@ -572,6 +637,8 @@ export default function App() {
               setPrintItemsList(itemsAtShelf.length > 0 ? itemsAtShelf : items.slice(0, 2));
               setIsPrintCenterOpen(true);
             }}
+            canManageShelves={userPermissions.canManageShelves}
+            canModifyData={userPermissions.canModifyData}
           />
         )}
 
@@ -583,20 +650,31 @@ export default function App() {
               </div>
               <h2 className="text-xl font-bold text-slate-900 dark:text-white">庫存盤點工作台</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                適合手持平板電腦巡檢貨架。點擊下方按鈕啟動即時盤點對話框，即時比對實點數量並記錄短溢。
+                {userPermissions.canAuditStock
+                  ? '適合手持平板電腦巡檢貨架。點擊下方按鈕啟動即時盤點對話框，即時比對實點數量並記錄短溢。'
+                  : '您目前的權限職銜為「一盤層級」：僅具備查閱與掃碼功能，不可變更系統資料。'}
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-3">
-                <button
-                  onClick={() => setIsAuditModalOpen(true)}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer"
-                >
-                  啟動現場實物盤點
-                </button>
+                {userPermissions.canAuditStock ? (
+                  <button
+                    onClick={() => setIsAuditModalOpen(true)}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/20 active:scale-95 transition-all cursor-pointer"
+                  >
+                    啟動現場實物盤點
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsAuditModalOpen(true)}
+                    className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm rounded-2xl shadow-sm transition-all cursor-pointer"
+                  >
+                    檢視盤點紀錄
+                  </button>
+                )}
                 <button
                   onClick={() => setIsScannerOpen(true)}
                   className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-2xl shadow-md active:scale-95 transition-all cursor-pointer"
                 >
-                  相機掃碼直接盤點
+                  相機掃碼查閱
                 </button>
               </div>
             </div>
@@ -660,6 +738,8 @@ export default function App() {
           setPrintItemsList([item]);
           setIsPrintCenterOpen(true);
         }}
+        canModifyData={userPermissions.canModifyData}
+        canAuditStock={userPermissions.canAuditStock}
       />
 
       <QrScannerModal
@@ -684,6 +764,7 @@ export default function App() {
         currentOperator={currentOperator}
         onRecordAudit={handleRecordAudit}
         targetItem={auditTargetItem}
+        canAuditStock={userPermissions.canAuditStock}
       />
 
       <AlertsModal

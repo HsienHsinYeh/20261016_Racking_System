@@ -26,6 +26,7 @@ interface StockAuditModalProps {
     note?: string
   ) => Promise<void>;
   targetItem?: InventoryItem | null;
+  canAuditStock?: boolean;
 }
 
 export const StockAuditModal: React.FC<StockAuditModalProps> = ({
@@ -35,6 +36,7 @@ export const StockAuditModal: React.FC<StockAuditModalProps> = ({
   currentOperator,
   onRecordAudit,
   targetItem,
+  canAuditStock = true,
 }) => {
   const [selectedItemId, setSelectedItemId] = useState<string>(targetItem?.id || items[0]?.id || '');
   const [countedQty, setCountedQty] = useState<string>(targetItem ? String(targetItem.quantity) : '');
@@ -75,6 +77,10 @@ export const StockAuditModal: React.FC<StockAuditModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentItem || !hasValidCount) return;
+    if (!canAuditStock) {
+      alert('⚠️ 權限不足：您目前的職銜為「一盤層級」，僅具備查閱與掃碼功能，不得修改或提交盤點資料。');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -367,16 +373,22 @@ export const StockAuditModal: React.FC<StockAuditModalProps> = ({
                   />
                 </div>
 
-                {/* Submit Button */}
+                {/* Submit Button or Permission Notice */}
                 <div className="pt-2 flex justify-end gap-3">
-                  <button
-                    type="submit"
-                    disabled={submitting || !hasValidCount}
-                    className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>{submitting ? '記錄中...' : '提交本項盤點結果'}</span>
-                  </button>
+                  {canAuditStock ? (
+                    <button
+                      type="submit"
+                      disabled={submitting || !hasValidCount}
+                      className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-2xl shadow-lg shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>{submitting ? '記錄中...' : '提交本項盤點結果'}</span>
+                    </button>
+                  ) : (
+                    <div className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400 text-center font-medium">
+                      🔒 您目前的權限職銜為<strong>「一盤層級」</strong>：僅具備查閱與掃碼功能，無法提交盤點調整
+                    </div>
+                  )}
                 </div>
               </form>
             ) : (

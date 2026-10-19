@@ -25,6 +25,8 @@ interface VisualShelfMapProps {
   onAddItemToShelf: (shelfLocation: string, zone: string, rack: string, tier: string, bin: string) => void;
   onGenerateShelfQr: (shelfLocation: string) => void;
   onOpenShelfManagement: (rackTarget?: { zoneId: string; rackCode: string }) => void;
+  canManageShelves?: boolean;
+  canModifyData?: boolean;
 }
 
 export const VisualShelfMap: React.FC<VisualShelfMapProps> = ({
@@ -34,6 +36,8 @@ export const VisualShelfMap: React.FC<VisualShelfMapProps> = ({
   onAddItemToShelf,
   onGenerateShelfQr,
   onOpenShelfManagement,
+  canManageShelves = true,
+  canModifyData = true,
 }) => {
   const zoneList = shelves && shelves.length > 0 ? shelves : DEFAULT_SHELF_ZONES;
   const [selectedZone, setSelectedZone] = useState('A區');
@@ -85,22 +89,26 @@ export const VisualShelfMap: React.FC<VisualShelfMapProps> = ({
 
           {/* Action buttons and Quick Filter Search */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => onOpenShelfManagement({ zoneId: selectedZone, rackCode: '' })}
-              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm cursor-pointer"
-              title="在當前分區新增貨架"
-            >
-              <Plus className="w-4 h-4" />
-              <span>新增貨架</span>
-            </button>
-            <button
-              onClick={() => onOpenShelfManagement()}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
-              title="管理所有貨架名稱與層數"
-            >
-              <Settings className="w-4 h-4" />
-              <span>貨架管理</span>
-            </button>
+            {canManageShelves && (
+              <>
+                <button
+                  onClick={() => onOpenShelfManagement({ zoneId: selectedZone, rackCode: '' })}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm cursor-pointer"
+                  title="在當前分區新增貨架"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>新增貨架</span>
+                </button>
+                <button
+                  onClick={() => onOpenShelfManagement()}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer"
+                  title="管理所有貨架名稱與層數"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>貨架管理</span>
+                </button>
+              </>
+            )}
             <div className="relative min-w-[200px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -190,14 +198,16 @@ export const VisualShelfMap: React.FC<VisualShelfMapProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2 self-end sm:self-auto">
-                      <button
-                        onClick={() => onOpenShelfManagement({ zoneId: selectedZone, rackCode })}
-                        className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                        title="編輯此貨架名稱、層數與規格"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                        <span>編輯貨架</span>
-                      </button>
+                      {canManageShelves && (
+                        <button
+                          onClick={() => onOpenShelfManagement({ zoneId: selectedZone, rackCode })}
+                          className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="編輯此貨架名稱、層數與規格"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>編輯貨架</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => onGenerateShelfQr(`${selectedZone}-${rackCode}架`)}
                         className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
@@ -409,17 +419,21 @@ export const VisualShelfMap: React.FC<VisualShelfMapProps> = ({
                   <div className="text-center py-8 px-4 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
                     <Warehouse className="w-8 h-8 mx-auto text-slate-400 mb-2" />
                     <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">此貨架儲位目前為空</div>
-                    <p className="text-xs text-slate-400 mt-1">可以將新進貨品放置此位置，或由其他貨架調撥過來。</p>
-                    <button
-                      onClick={() => {
-                        const { zone, rack, tier, bin } = parseSlotLocation(selectedSlot);
-                        onAddItemToShelf(selectedSlot, zone, rack, tier, bin);
-                      }}
-                      className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-sm transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>登記新貨品入庫於此儲位</span>
-                    </button>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {canModifyData ? '可以將新進貨品放置此位置，或由其他貨架調撥過來。' : '目前此位置無存放料件。'}
+                    </p>
+                    {canModifyData && (
+                      <button
+                        onClick={() => {
+                          const { zone, rack, tier, bin } = parseSlotLocation(selectedSlot);
+                          onAddItemToShelf(selectedSlot, zone, rack, tier, bin);
+                        }}
+                        className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-sm transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>登記新貨品入庫於此儲位</span>
+                      </button>
+                    )}
                   </div>
                 )}
 

@@ -19,6 +19,7 @@ import {
   Menu
 } from 'lucide-react';
 import { Operator, ConnectedUser, SystemAlert, AuthUser } from '../types/inventory';
+import { getUserPermissions } from '../utils/permissions';
 
 interface NavbarProps {
   currentOperator: Operator;
@@ -71,7 +72,10 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const unreadAlerts = alerts.filter(a => !a.acknowledged);
   const criticalCount = alerts.filter(a => a.severity === 'critical').length;
-  const isAdmin = currentUser?.username?.toLowerCase() === 'admin' || currentUser?.role?.includes('最高主管');
+  const permissions = getUserPermissions(currentUser?.role || currentOperator?.role, currentUser?.username);
+  const isAdmin = permissions.canManageAccounts;
+  const canModifyData = permissions.canModifyData;
+  const canManageShelves = permissions.canManageShelves;
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-white shadow-lg backdrop-blur select-none">
@@ -166,18 +170,20 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="hidden lg:inline">標籤列印</span>
             </button>
 
-            {/* Add Item (Hidden on small mobile, visible on md+) */}
-            <button
-              onClick={onOpenAddItem}
-              className="hidden md:flex p-2 sm:px-3 sm:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium items-center gap-1.5 transition-colors cursor-pointer"
-              title="新增貨品入庫"
-            >
-              <Plus className="w-4 h-4 text-emerald-400" />
-              <span className="hidden lg:inline">新增貨品</span>
-            </button>
+            {/* Add Item (Hidden on small mobile, visible on md+ if permitted) */}
+            {canModifyData && (
+              <button
+                onClick={onOpenAddItem}
+                className="hidden md:flex p-2 sm:px-3 sm:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium items-center gap-1.5 transition-colors cursor-pointer"
+                title="新增貨品入庫"
+              >
+                <Plus className="w-4 h-4 text-emerald-400" />
+                <span className="hidden lg:inline">新增貨品</span>
+              </button>
+            )}
 
-            {/* Shelf Management (Hidden on small mobile, visible on md+) */}
-            {onOpenShelfManagement && (
+            {/* Shelf Management (Hidden on small mobile, visible on md+ if permitted) */}
+            {canManageShelves && onOpenShelfManagement && (
               <button
                 onClick={onOpenShelfManagement}
                 className="hidden md:flex p-2 sm:px-3 sm:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium items-center gap-1.5 transition-colors cursor-pointer"
@@ -286,16 +292,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     )}
 
-                    <button
-                      onClick={() => {
-                        setShowUserDropdown(false);
-                        onResetSeed();
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:text-amber-300 hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>重設預設示範貨品資料</span>
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          onResetSeed();
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-400 hover:text-amber-300 hover:bg-slate-700/50 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>重設預設示範貨品資料</span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => {
@@ -365,16 +373,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>相機掃描條碼</span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setShowMobileMenu(false);
-                    onOpenAddItem();
-                  }}
-                  className="flex items-center gap-2 p-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-xs border border-slate-700 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4 text-emerald-400" />
-                  <span>新增貨品入庫</span>
-                </button>
+                {canModifyData && (
+                  <button
+                    onClick={() => {
+                      setShowMobileMenu(false);
+                      onOpenAddItem();
+                    }}
+                    className="flex items-center gap-2 p-3 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl text-xs border border-slate-700 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4 text-emerald-400" />
+                    <span>新增貨品入庫</span>
+                  </button>
+                )}
 
                 <button
                   onClick={() => {
@@ -387,7 +397,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span>標籤列印中心</span>
                 </button>
 
-                {onOpenShelfManagement && (
+                {canManageShelves && onOpenShelfManagement && (
                   <button
                     onClick={() => {
                       setShowMobileMenu(false);

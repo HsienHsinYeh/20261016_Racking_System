@@ -29,6 +29,8 @@ interface ItemDetailDrawerProps {
   onQuickAudit: (item: InventoryItem) => void;
   onAdjustStock: (item: InventoryItem, delta: number, reason: string) => Promise<void>;
   onPrintSingle: (item: InventoryItem) => void;
+  canModifyData?: boolean;
+  canAuditStock?: boolean;
 }
 
 export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
@@ -39,6 +41,8 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
   onQuickAudit,
   onAdjustStock,
   onPrintSingle,
+  canModifyData = true,
+  canAuditStock = true,
 }) => {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [customDelta, setCustomDelta] = useState<string>('');
@@ -97,16 +101,18 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
             >
               <Printer className="w-5 h-5" />
             </button>
-            <button
-              onClick={() => {
-                onClose();
-                onEdit(item);
-              }}
-              className="p-2 text-slate-500 hover:text-amber-500 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title="編輯貨品詳細"
-            >
-              <Edit3 className="w-5 h-5" />
-            </button>
+            {canModifyData && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit(item);
+                }}
+                className="p-2 text-slate-500 hover:text-amber-500 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="編輯貨品詳細"
+              >
+                <Edit3 className="w-5 h-5" />
+              </button>
+            )}
             <button
               onClick={onClose}
               className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
@@ -256,38 +262,50 @@ export const ItemDetailDrawer: React.FC<ItemDetailDrawerProps> = ({
 
               {/* Action Buttons: Quick Stock In / Out / Audit */}
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => {
-                    setAdjustType('out');
-                    setShowAdjustPopup(true);
-                  }}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-rose-300 font-bold text-sm rounded-xl flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-                >
-                  <Minus className="w-4 h-4" />
-                  <span>出庫 / 領料</span>
-                </button>
+                {canModifyData && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setAdjustType('out');
+                        setShowAdjustPopup(true);
+                      }}
+                      className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-rose-300 font-bold text-sm rounded-xl flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Minus className="w-4 h-4" />
+                      <span>出庫 / 領料</span>
+                    </button>
 
-                <button
-                  onClick={() => {
-                    setAdjustType('in');
-                    setShowAdjustPopup(true);
-                  }}
-                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>進貨 / 入庫</span>
-                </button>
+                    <button
+                      onClick={() => {
+                        setAdjustType('in');
+                        setShowAdjustPopup(true);
+                      }}
+                      className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm rounded-xl flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-md"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>進貨 / 入庫</span>
+                    </button>
+                  </>
+                )}
 
-                <button
-                  onClick={() => {
-                    onClose();
-                    onQuickAudit(item);
-                  }}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-                >
-                  <ClipboardCheck className="w-4 h-4" />
-                  <span>現場盤點確認</span>
-                </button>
+                {canAuditStock && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onQuickAudit(item);
+                    }}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <ClipboardCheck className="w-4 h-4" />
+                    <span>現場盤點確認</span>
+                  </button>
+                )}
+
+                {!canModifyData && !canAuditStock && (
+                  <span className="text-xs text-slate-400 italic bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700">
+                    🔒 一盤層級：僅供查閱料件資訊與標籤列印，無修改或盤點權限
+                  </span>
+                )}
               </div>
             </div>
 

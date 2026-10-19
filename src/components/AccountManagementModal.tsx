@@ -21,6 +21,7 @@ import {
 import { ManagedAccount, AuthUser } from '../types/inventory';
 import { realtimeClient } from '../services/api';
 import { playSound } from '../utils/sound';
+import { SYSTEM_ROLES, SystemRole, normalizeRole, getUserPermissions } from '../utils/permissions';
 
 interface AccountManagementModalProps {
   isOpen: boolean;
@@ -30,16 +31,7 @@ interface AccountManagementModalProps {
   onAddToast: (toast: { title: string; message: string; type: 'info' | 'success' | 'warning' | 'alert' }) => void;
 }
 
-const ROLES_LIST = [
-  '系統最高主管 / 全權限',
-  '倉管課長 / 系統主管',
-  'A/B區資深倉管員',
-  'C/D區資深倉管員',
-  '現場入出庫專員',
-  '品管檢驗組長',
-  '總裝產線備料專員',
-  '資材物料調撥員'
-];
+const ROLES_LIST: SystemRole[] = [...SYSTEM_ROLES];
 
 const DEPARTMENTS_LIST = [
   '智慧倉儲運營部',
@@ -70,7 +62,7 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
   const [formUsername, setFormUsername] = useState<string>('');
   const [formPassword, setFormPassword] = useState<string>('');
   const [formName, setFormName] = useState<string>('');
-  const [formRole, setFormRole] = useState<string>(ROLES_LIST[2]);
+  const [formRole, setFormRole] = useState<SystemRole>('資料管理層級');
   const [formDepartment, setFormDepartment] = useState<string>(DEPARTMENTS_LIST[1]);
   const [formAvatar, setFormAvatar] = useState<string>(AVATAR_PRESETS[0]);
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -99,7 +91,8 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
   if (!isOpen) return null;
 
   // Strict check: only admin can access
-  const isAdmin = currentUser?.username?.toLowerCase() === 'admin' || currentUser?.role?.includes('最高主管');
+  const permissions = getUserPermissions(currentUser?.role, currentUser?.username);
+  const isAdmin = permissions.canManageAccounts;
 
   if (!isAdmin) {
     return (
@@ -127,7 +120,7 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
     setFormUsername('');
     setFormPassword('');
     setFormName('');
-    setFormRole(ROLES_LIST[2]);
+    setFormRole('資料管理層級');
     setFormDepartment(DEPARTMENTS_LIST[1]);
     setFormAvatar(AVATAR_PRESETS[0]);
     setShowPassword(false);
@@ -140,7 +133,7 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
     setFormUsername(acc.username);
     setFormPassword(acc.password || '');
     setFormName(acc.name);
-    setFormRole(acc.role);
+    setFormRole(normalizeRole(acc.role, acc.username));
     setFormDepartment(acc.department);
     setFormAvatar(acc.avatar);
     setShowPassword(false);
@@ -367,10 +360,34 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
                       </div>
 
                       {/* Details: Role & Department */}
-                      <div className="space-y-1 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs">
+                      <div className="space-y-1.5 mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">系統角色：</span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">{acc.role}</span>
+                          {(() => {
+                            const normRole = normalizeRole(acc.role, acc.username);
+                            if (normRole === '系統管理員') {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                  系統管理員
+                                </span>
+                              );
+                            }
+                            if (normRole === '資料管理層級') {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-xs bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                                  <Users className="w-3.5 h-3.5" />
+                                  資料管理層級
+                                </span>
+                              );
+                            }
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-xs bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                <Eye className="w-3.5 h-3.5" />
+                                一盤層級
+                              </span>
+                            );
+                          })()}
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">所屬部門：</span>
@@ -546,17 +563,35 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
               {/* Role */}
               <div>
                 <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  系統角色與權限職銜
+                  系統角色與權限職銜 (共3類)
                 </label>
                 <select
                   value={formRole}
-                  onChange={(e) => setFormRole(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200"
+                  disabled={editingAccount?.username?.toLowerCase() === 'admin'}
+                  onChange={(e) => setFormRole(e.target.value as SystemRole)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 disabled:opacity-60"
                 >
                   {ROLES_LIST.map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
                 </select>
+                {editingAccount?.username?.toLowerCase() === 'admin' ? (
+                  <span className="text-[11px] text-amber-500 mt-1 block font-medium">
+                    🔒 admin 為系統核心帳號，權限固定為「系統管理員」且不得變更
+                  </span>
+                ) : (
+                  <div className="mt-1.5 p-2 rounded-lg bg-slate-100 dark:bg-slate-800/80 text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
+                    {formRole === '系統管理員' && (
+                      <p className="text-amber-600 dark:text-amber-400 font-medium">👑 <strong>系統管理員</strong>：擁有所有修改權限跟刪除任何資料的權限（包含使用者帳號與權限管理）。</p>
+                    )}
+                    {formRole === '資料管理層級' && (
+                      <p className="text-blue-600 dark:text-blue-400 font-medium">💼 <strong>資料管理層級</strong>：不得變更系統角色的任何資料。擁有除此之外的所有貨品、庫存與貨架維護權限。</p>
+                    )}
+                    {formRole === '一盤層級' && (
+                      <p className="text-emerald-600 dark:text-emerald-400 font-medium">🔍 <strong>一盤層級</strong>：只有查閱資料跟掃碼功能，不得修改任何資料。</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Department */}
