@@ -336,30 +336,30 @@ export const INITIAL_OPERATORS: Operator[] = [
   {
     id: 'op-1',
     name: '陳建良',
-    role: 'A/B區資深倉管員',
+    role: '資料管理層級',
     avatar: '👨‍🔧',
-    department: '倉儲物流部'
+    department: '倉管課'
   },
   {
     id: 'op-2',
     name: '張家豪',
-    role: '倉管課長 / 系統主管',
+    role: '系統管理員',
     avatar: '👨‍💼',
-    department: '運營管理部'
+    department: '管理部'
   },
   {
     id: 'op-3',
     name: '王小華',
-    role: '現場入出庫專員',
+    role: '一盤層級',
     avatar: '👩‍🔧',
-    department: '倉儲物流部'
+    department: '倉管課'
   },
   {
     id: 'op-4',
     name: '李秉勳',
-    role: '品管檢驗組長',
+    role: '一盤層級',
     avatar: '🧑‍🔬',
-    department: '品質保證部'
+    department: '模具課'
   }
 ];
 
@@ -378,46 +378,46 @@ export const USER_ACCOUNTS: UserAccount[] = [
     id: 'usr-admin',
     username: 'admin',
     passwordHash: 'admin',
-    name: '系統管理員 (主管)',
-    role: '系統最高主管 / 全權限',
+    name: '系統管理員',
+    role: '系統管理員',
     avatar: '🛡️',
-    department: '智慧倉儲運營部'
+    department: '管理部'
   },
   {
     id: 'usr-chen',
     username: 'chen',
     passwordHash: 'admin',
     name: '陳建良',
-    role: 'A/B區資深倉管員',
+    role: '資料管理層級',
     avatar: '👨‍🔧',
-    department: '倉儲物流部'
+    department: '倉管課'
   },
   {
     id: 'usr-chang',
     username: 'chang',
     passwordHash: 'admin',
     name: '張家豪',
-    role: '倉管課長 / 系統主管',
+    role: '系統管理員',
     avatar: '👨‍💼',
-    department: '運營管理部'
+    department: '管理部'
   },
   {
     id: 'usr-wang',
     username: 'wang',
     passwordHash: 'admin',
     name: '王小華',
-    role: '現場入出庫專員',
+    role: '一盤層級',
     avatar: '👩‍🔧',
-    department: '倉儲物流部'
+    department: '倉管課'
   },
   {
     id: 'usr-lee',
     username: 'lee',
     passwordHash: 'admin',
     name: '李秉勳',
-    role: '品管檢驗組長',
+    role: '一盤層級',
     avatar: '🧑‍🔬',
-    department: '品質保證部'
+    department: '模具課'
   }
 ];
 
@@ -436,6 +436,16 @@ function normalizeUserRole(role: string, username?: string): string {
   return '一盤層級';
 }
 
+function normalizeUserDepartment(dept?: string): string {
+  if (!dept) return '倉管課';
+  const d = String(dept).trim();
+  if (d === '管理部' || d.includes('智慧倉儲') || d.includes('運營') || d.includes('管理')) return '管理部';
+  if (d === '生產課' || d.includes('智慧製造') || d.includes('組裝') || d.includes('生產')) return '生產課';
+  if (d === '模具課' || d.includes('模具') || d.includes('加工') || d.includes('品質') || d.includes('品管')) return '模具課';
+  if (d === '倉管課' || d.includes('倉儲') || d.includes('物流')) return '倉管課';
+  return '倉管課';
+}
+
 function loadUsers(): UserAccount[] {
   try {
     ensureDataDir();
@@ -450,6 +460,7 @@ function loadUsers(): UserAccount[] {
     return users.map((u) => ({
       ...u,
       role: normalizeUserRole(u.role, u.username),
+      department: normalizeUserDepartment(u.department),
       name: u.username?.toLowerCase() === 'admin' && (u.name === '系統管理員 (主管)' || !u.name) ? '系統管理員' : u.name
     }));
   } catch (err) {
@@ -838,7 +849,7 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
         name: String(name).trim(),
         role: normalizeUserRole(role, cleanUsername),
         avatar: String(avatar || '👨‍🔧').trim(),
-        department: String(department || '倉儲物流部').trim(),
+        department: normalizeUserDepartment(department),
       };
 
       users.push(newAccount);
@@ -898,7 +909,7 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
         ...existing,
         name: name ? String(name).trim() : existing.name,
         role: targetRole,
-        department: department ? String(department).trim() : existing.department,
+        department: department ? normalizeUserDepartment(department) : existing.department,
         avatar: avatar ? String(avatar).trim() : existing.avatar,
         passwordHash: password && String(password).trim().length > 0 ? String(password).trim() : existing.passwordHash,
       };

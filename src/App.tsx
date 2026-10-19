@@ -39,7 +39,7 @@ const DEFAULT_OPERATOR: Operator = {
   name: '陳建良',
   role: '資料管理層級',
   avatar: '👨‍🔧',
-  department: '倉儲物流部'
+  department: '倉管課'
 };
 
 export default function App() {

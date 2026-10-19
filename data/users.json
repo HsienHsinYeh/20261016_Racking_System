@@ -6,7 +6,7 @@
     "name": "系統管理員",
     "role": "系統管理員",
     "avatar": "🛡️",
-    "department": "智慧倉儲運營部"
+    "department": "管理部"
   },
   {
     "id": "usr-chen",
@@ -15,7 +15,7 @@
     "name": "陳建良",
     "role": "資料管理層級",
     "avatar": "👨‍🔧",
-    "department": "倉儲物流部"
+    "department": "倉管課"
   },
   {
     "id": "usr-chang",
@@ -24,7 +24,7 @@
     "name": "張家豪",
     "role": "系統管理員",
     "avatar": "👨‍💼",
-    "department": "運營管理部"
+    "department": "管理部"
   },
   {
     "id": "usr-wang",
@@ -33,7 +33,7 @@
     "name": "王小華",
     "role": "一盤層級",
     "avatar": "👩‍🔧",
-    "department": "倉儲物流部"
+    "department": "倉管課"
   },
   {
     "id": "usr-lee",
@@ -42,6 +42,6 @@
     "name": "李秉勳",
     "role": "一盤層級",
     "avatar": "🧑‍🔬",
-    "department": "品質保證部"
+    "department": "模具課"
   }
 ]

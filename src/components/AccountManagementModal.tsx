@@ -21,7 +21,7 @@ import {
 import { ManagedAccount, AuthUser } from '../types/inventory';
 import { realtimeClient } from '../services/api';
 import { playSound } from '../utils/sound';
-import { SYSTEM_ROLES, SystemRole, normalizeRole, getUserPermissions } from '../utils/permissions';
+import { SYSTEM_ROLES, SystemRole, normalizeRole, getUserPermissions, DEPARTMENTS_LIST, Department, normalizeDepartment } from '../utils/permissions';
 
 interface AccountManagementModalProps {
   isOpen: boolean;
@@ -32,14 +32,6 @@ interface AccountManagementModalProps {
 }
 
 const ROLES_LIST: SystemRole[] = [...SYSTEM_ROLES];
-
-const DEPARTMENTS_LIST = [
-  '智慧倉儲運營部',
-  '倉儲物流部',
-  '運營管理部',
-  '品質保證部',
-  '智慧製造部'
-];
 
 const AVATAR_PRESETS = ['👨‍🔧', '👩‍🔧', '👨‍💼', '🧑‍🔬', '🛡️', '👷', '👩‍💻', '👨‍💻'];
 
@@ -63,7 +55,7 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
   const [formPassword, setFormPassword] = useState<string>('');
   const [formName, setFormName] = useState<string>('');
   const [formRole, setFormRole] = useState<SystemRole>('資料管理層級');
-  const [formDepartment, setFormDepartment] = useState<string>(DEPARTMENTS_LIST[1]);
+  const [formDepartment, setFormDepartment] = useState<string>('倉管課');
   const [formAvatar, setFormAvatar] = useState<string>(AVATAR_PRESETS[0]);
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [formSubmitting, setFormSubmitting] = useState<boolean>(false);
@@ -121,7 +113,7 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
     setFormPassword('');
     setFormName('');
     setFormRole('資料管理層級');
-    setFormDepartment(DEPARTMENTS_LIST[1]);
+    setFormDepartment('倉管課');
     setFormAvatar(AVATAR_PRESETS[0]);
     setShowPassword(false);
     setIsFormOpen(true);
@@ -134,7 +126,7 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
     setFormPassword(acc.password || '');
     setFormName(acc.name);
     setFormRole(normalizeRole(acc.role, acc.username));
-    setFormDepartment(acc.department);
+    setFormDepartment(normalizeDepartment(acc.department));
     setFormAvatar(acc.avatar);
     setShowPassword(false);
     setIsFormOpen(true);
@@ -229,12 +221,14 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
 
   // Filter accounts
   const filteredAccounts = accounts.filter(acc => {
-    const matchDept = selectedDept === 'ALL' || acc.department === selectedDept;
+    const accDept = normalizeDepartment(acc.department);
+    const matchDept = selectedDept === 'ALL' || accDept === selectedDept || acc.department === selectedDept;
     const term = searchTerm.trim().toLowerCase();
     const matchSearch = !term ||
       acc.username.toLowerCase().includes(term) ||
       acc.name.toLowerCase().includes(term) ||
-      acc.role.toLowerCase().includes(term);
+      acc.role.toLowerCase().includes(term) ||
+      accDept.toLowerCase().includes(term);
     return matchDept && matchSearch;
   });
 
@@ -391,7 +385,9 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-slate-400">所屬部門：</span>
-                          <span className="text-slate-600 dark:text-slate-400">{acc.department}</span>
+                          <span className="font-semibold text-slate-700 dark:text-slate-300">
+                            {normalizeDepartment(acc.department)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -608,6 +604,10 @@ export const AccountManagementModal: React.FC<AccountManagementModalProps> = ({
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5 flex items-center gap-1">
+                  <span>💡</span>
+                  <span>部門類別僅作為組織識別歸屬，不影響各層級權限。</span>
+                </p>
               </div>
 
               {/* Actions */}

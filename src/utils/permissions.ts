@@ -87,3 +87,22 @@ export function getUserPermissions(role?: string, username?: string): UserPermis
     canView: true,
   };
 }
+
+export type Department = '管理部' | '倉管課' | '生產課' | '模具課';
+
+export const DEPARTMENTS_LIST: Department[] = [
+  '管理部',
+  '倉管課',
+  '生產課',
+  '模具課'
+];
+
+export function normalizeDepartment(dept?: string): Department {
+  if (!dept) return '倉管課';
+  const d = dept.trim();
+  if (d === '管理部' || d.includes('智慧倉儲') || d.includes('運營') || d.includes('管理')) return '管理部';
+  if (d === '生產課' || d.includes('智慧製造') || d.includes('組裝') || d.includes('生產')) return '生產課';
+  if (d === '模具課' || d.includes('模具') || d.includes('加工') || d.includes('品質') || d.includes('品管')) return '模具課';
+  if (d === '倉管課' || d.includes('倉儲') || d.includes('物流')) return '倉管課';
+  return '倉管課';
+}

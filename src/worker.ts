@@ -72,6 +72,16 @@ function normalizeUserRole(role: string, username: string): string {
   return '一盤層級';
 }
 
+function normalizeUserDepartment(dept?: string): string {
+  if (!dept) return '倉管課';
+  const d = String(dept).trim();
+  if (d === '管理部' || d.includes('智慧倉儲') || d.includes('運營') || d.includes('管理')) return '管理部';
+  if (d === '生產課' || d.includes('智慧製造') || d.includes('組裝') || d.includes('生產')) return '生產課';
+  if (d === '模具課' || d.includes('模具') || d.includes('加工') || d.includes('品質') || d.includes('品管')) return '模具課';
+  if (d === '倉管課' || d.includes('倉儲') || d.includes('物流')) return '倉管課';
+  return '倉管課';
+}
+
 async function getUsers(env: Env): Promise<any[]> {
   let list = USER_ACCOUNTS;
   if (env.INVENTORY_KV) {
@@ -88,6 +98,7 @@ async function getUsers(env: Env): Promise<any[]> {
   return list.map((u: any) => ({
     ...u,
     role: normalizeUserRole(u.role, u.username),
+    department: normalizeUserDepartment(u.department),
     name: u.username?.toLowerCase() === 'admin' && (u.name === '系統管理員 (主管)' || !u.name) ? '系統管理員' : u.name
   }));
 }
@@ -410,7 +421,7 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
             name: String(name).trim(),
             role: normalizeUserRole(role, cleanUsername),
             avatar: String(avatar || '👨‍🔧').trim(),
-            department: String(department || '倉儲物流部').trim(),
+            department: normalizeUserDepartment(department),
           };
 
           users.push(newAccount);
@@ -454,7 +465,7 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
             ...existing,
             name: name ? String(name).trim() : existing.name,
             role: targetRole,
-            department: department ? String(department).trim() : existing.department,
+            department: department ? normalizeUserDepartment(department) : existing.department,
             avatar: avatar ? String(avatar).trim() : existing.avatar,
             passwordHash:
               password && String(password).trim().length > 0
