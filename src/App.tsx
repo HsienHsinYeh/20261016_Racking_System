@@ -22,6 +22,7 @@ import { LoginView } from './components/LoginView';
 import { AccountManagementModal } from './components/AccountManagementModal';
 import { InventoryChatbot } from './components/InventoryChatbot';
 import { ShelfManagementModal } from './components/ShelfManagementModal';
+import { SwitchAccountModal } from './components/SwitchAccountModal';
 import { playSound } from './utils/sound';
 import { getUserPermissions } from './utils/permissions';
 import { 
@@ -46,14 +47,14 @@ export default function App() {
   // Authentication State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     try {
-      const saved = localStorage.getItem('hh_wms_auth_user');
+      const saved = localStorage.getItem('hh_wms_auth_user') || sessionStorage.getItem('hh_wms_auth_user');
       if (saved) return JSON.parse(saved);
     } catch {}
     return null;
   });
   const [authChecking, setAuthChecking] = useState<boolean>(true);
 
-  // Compute permissions based on logged-in user or active operator
+  // Compute permissions based on logged-in user
   const userPermissions = getUserPermissions(
     currentUser?.role || DEFAULT_OPERATOR.role,
     currentUser?.username
@@ -63,7 +64,24 @@ export default function App() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [alerts, setAlerts] = useState<SystemAlert[]>([]);
   const [operators, setOperators] = useState<Operator[]>([DEFAULT_OPERATOR]);
-  const [currentOperator, setCurrentOperator] = useState<Operator>(DEFAULT_OPERATOR);
+  const [currentOperator, setCurrentOperator] = useState<Operator>(() => {
+    try {
+      const saved = localStorage.getItem('hh_wms_auth_user') || sessionStorage.getItem('hh_wms_auth_user');
+      if (saved) {
+        const u = JSON.parse(saved);
+        if (u?.id && u?.name) {
+          return {
+            id: u.id,
+            name: u.name,
+            role: u.role,
+            avatar: u.avatar || '👨‍🔧',
+            department: u.department || '倉管課'
+          };
+        }
+      }
+    } catch {}
+    return DEFAULT_OPERATOR;
+  });
   const [onlineCount, setOnlineCount] = useState<number>(1);
   const [onlineUsers, setOnlineUsers] = useState<ConnectedUser[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -84,6 +102,7 @@ export default function App() {
   const [auditTargetItem, setAuditTargetItem] = useState<InventoryItem | null>(null);
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState<boolean>(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
+  const [isSwitchAccountOpen, setIsSwitchAccountOpen] = useState<boolean>(false);
   const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
   const [defaultShelfForAdd, setDefaultShelfForAdd] = useState<any>(null);
 
@@ -228,8 +247,6 @@ export default function App() {
       .then(ops => {
         if (ops.length > 0) {
           setOperators(ops);
-          setCurrentOperator(ops[0]);
-          realtimeClient.setOperator(ops[0]);
         }
       })
       .catch(console.warn);
@@ -247,7 +264,7 @@ export default function App() {
     // Check authenticated session
     const checkSession = async () => {
       try {
-        const saved = localStorage.getItem('hh_wms_auth_user');
+        const saved = localStorage.getItem('hh_wms_auth_user') || sessionStorage.getItem('hh_wms_auth_user');
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed?.token && parsed?.id) {
@@ -267,6 +284,7 @@ export default function App() {
       } catch (err) {
         console.warn('Session expired or invalid:', err);
         localStorage.removeItem('hh_wms_auth_user');
+        sessionStorage.removeItem('hh_wms_auth_user');
         setCurrentUser(null);
       } finally {
         setAuthChecking(false);
@@ -293,6 +311,8 @@ export default function App() {
   const handleLoginSuccess = (user: AuthUser, rememberMe: boolean) => {
     if (rememberMe) {
       localStorage.setItem('hh_wms_auth_user', JSON.stringify(user));
+    } else {
+      sessionStorage.setItem('hh_wms_auth_user', JSON.stringify(user));
     }
     setCurrentUser(user);
     const op: Operator = {
@@ -311,24 +331,46 @@ export default function App() {
     });
   };
 
+  // Handle Switch Account (Authenticated with Username & Password)
+  const handleSwitchAccount = (newUser: AuthUser, rememberMe: boolean) => {
+    // Automatically log out previous account
+    localStorage.removeItem('hh_wms_auth_user');
+    sessionStorage.removeItem('hh_wms_auth_user');
+
+    // Save new account credentials
+    if (rememberMe) {
+      localStorage.setItem('hh_wms_auth_user', JSON.stringify(newUser));
+    } else {
+      sessionStorage.setItem('hh_wms_auth_user', JSON.stringify(newUser));
+    }
+
+    // Set new user & operator
+    setCurrentUser(newUser);
+    const op: Operator = {
+      id: newUser.id,
+      name: newUser.name,
+      role: newUser.role,
+      avatar: newUser.avatar,
+      department: newUser.department
+    };
+    setCurrentOperator(op);
+    realtimeClient.setOperator(op);
+
+    addToast({
+      title: '🔄 帳號切換成功',
+      message: `已自動登出原帳號，目前登入為【${newUser.name}】(${newUser.role} • ${newUser.department})`,
+      type: 'success'
+    });
+  };
+
   // Handle Logout
   const handleLogout = () => {
     localStorage.removeItem('hh_wms_auth_user');
+    sessionStorage.removeItem('hh_wms_auth_user');
     setCurrentUser(null);
     addToast({
       title: '🔒 已安全登出',
       message: '已安全登出賢欣貨架管理系統',
-      type: 'info'
-    });
-  };
-
-  // Operator select handler
-  const handleSelectOperator = (op: Operator) => {
-    setCurrentOperator(op);
-    realtimeClient.setOperator(op);
-    addToast({
-      title: '👤 身分已切換',
-      message: `目前以 ${op.name} (${op.role}) 身分進行各項庫存操作`,
       type: 'info'
     });
   };
@@ -547,7 +589,6 @@ export default function App() {
         currentOperator={currentOperator}
         currentUser={currentUser}
         operators={operators}
-        onSelectOperator={handleSelectOperator}
         onlineCount={onlineCount}
         onlineUsers={onlineUsers}
         isConnected={isConnected}
@@ -574,6 +615,7 @@ export default function App() {
         }}
         onResetSeed={handleResetSeed}
         onOpenChatbot={() => setIsChatbotOpen(prev => !prev)}
+        onOpenSwitchAccount={() => setIsSwitchAccountOpen(true)}
         activeView={activeView}
         onChangeView={setActiveView}
         onLogout={handleLogout}
@@ -787,6 +829,13 @@ export default function App() {
           realtimeClient.fetchOperators().then(ops => setOperators(ops)).catch(console.warn);
         }}
         onAddToast={addToast}
+      />
+
+      <SwitchAccountModal
+        isOpen={isSwitchAccountOpen}
+        onClose={() => setIsSwitchAccountOpen(false)}
+        currentUser={currentUser}
+        onSwitchSuccess={handleSwitchAccount}
       />
 
       {/* Floating Inventory Chatbot */}
