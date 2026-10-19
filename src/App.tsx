@@ -21,13 +21,16 @@ import { RealtimeToast, ToastMessage } from './components/RealtimeToast';
 import { LoginView } from './components/LoginView';
 import { AccountManagementModal } from './components/AccountManagementModal';
 import { InventoryChatbot } from './components/InventoryChatbot';
+import { ShelfManagementModal } from './components/ShelfManagementModal';
 import { playSound } from './utils/sound';
 import { 
   InventoryItem, 
   SystemAlert, 
   Operator, 
   ConnectedUser,
-  AuthUser 
+  AuthUser,
+  ShelfZoneConfig,
+  DEFAULT_SHELF_ZONES
 } from './types/inventory';
 
 const DEFAULT_OPERATOR: Operator = {
@@ -76,6 +79,17 @@ export default function App() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
   const [isChatbotOpen, setIsChatbotOpen] = useState<boolean>(false);
   const [defaultShelfForAdd, setDefaultShelfForAdd] = useState<any>(null);
+
+  // Shelves State
+  const [shelves, setShelves] = useState<ShelfZoneConfig[]>(() => {
+    try {
+      const cached = localStorage.getItem('hh_wms_shelves');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return DEFAULT_SHELF_ZONES;
+  });
+  const [isShelfModalOpen, setIsShelfModalOpen] = useState<boolean>(false);
+  const [shelfModalTarget, setShelfModalTarget] = useState<{ zoneId: string; rackCode: string } | undefined>(undefined);
 
   // Real-time toast notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -209,6 +223,16 @@ export default function App() {
           setOperators(ops);
           setCurrentOperator(ops[0]);
           realtimeClient.setOperator(ops[0]);
+        }
+      })
+      .catch(console.warn);
+
+    // Fetch dynamic shelves configuration
+    realtimeClient.fetchShelves()
+      .then(fetchedShelves => {
+        if (fetchedShelves && fetchedShelves.length > 0) {
+          setShelves(fetchedShelves);
+          localStorage.setItem('hh_wms_shelves', JSON.stringify(fetchedShelves));
         }
       })
       .catch(console.warn);
@@ -351,6 +375,55 @@ export default function App() {
     }
   };
 
+  // Save dynamic shelves configuration
+  const handleSaveShelves = async (
+    updatedShelves: ShelfZoneConfig[],
+    migratedItems?: { originalLocationPrefix: string; newLocationPrefix: string }[]
+  ) => {
+    try {
+      setShelves(updatedShelves);
+      localStorage.setItem('hh_wms_shelves', JSON.stringify(updatedShelves));
+      await realtimeClient.saveShelves(updatedShelves);
+
+      // If any items were migrated due to shelf code change, update items
+      if (migratedItems && migratedItems.length > 0) {
+        for (const migration of migratedItems) {
+          const itemsToUpdate = items.filter(i => i.shelfLocation.startsWith(migration.originalLocationPrefix));
+          for (const item of itemsToUpdate) {
+            const newShelfLocation = item.shelfLocation.replace(
+              migration.originalLocationPrefix,
+              migration.newLocationPrefix
+            );
+            const parts = newShelfLocation.split('-');
+            const newZone = parts[0] || item.zone;
+            const newRack = parts[1]?.replace('架', '') || item.shelfRack;
+            await realtimeClient.updateItem({
+              ...item,
+              shelfLocation: newShelfLocation,
+              zone: newZone,
+              shelfRack: newRack,
+              updatedBy: currentOperator.name
+            }, '調撥變更貨架編號');
+          }
+        }
+      }
+
+      addToast({
+        title: '✅ 貨架配置已更新',
+        message: '倉庫立體貨架矩陣與層數設定已儲存並同步',
+        type: 'success'
+      });
+    } catch (err: any) {
+      console.error('Failed to save shelves:', err);
+      addToast({
+        title: '❌ 儲存貨架失敗',
+        message: err.message || '無法儲存貨架變更',
+        type: 'alert'
+      });
+      throw err;
+    }
+  };
+
   // QR Scanner found actions
   const handleFoundItemFromScan = (item: InventoryItem) => {
     setSelectedItemDrawer(item);
@@ -419,6 +492,10 @@ export default function App() {
         }}
         onOpenAlerts={() => setIsAlertsModalOpen(true)}
         onOpenAccountManagement={() => setIsAccountModalOpen(true)}
+        onOpenShelfManagement={() => {
+          setShelfModalTarget(undefined);
+          setIsShelfModalOpen(true);
+        }}
         onResetSeed={handleResetSeed}
         onOpenChatbot={() => setIsChatbotOpen(prev => !prev)}
         activeView={activeView}
@@ -466,6 +543,11 @@ export default function App() {
         {activeView === 'shelf_map' && (
           <VisualShelfMap
             items={items}
+            shelves={shelves}
+            onOpenShelfManagement={(rackTarget) => {
+              setShelfModalTarget(rackTarget);
+              setIsShelfModalOpen(true);
+            }}
             onSelectItem={(item) => setSelectedItemDrawer(item)}
             onAddItemToShelf={(shelfLocation, zone, rack, tier, bin) => {
               setEditingItem(null);
@@ -533,6 +615,19 @@ export default function App() {
         onSave={handleSaveItem}
         item={editingItem}
         defaultShelf={defaultShelfForAdd}
+        shelves={shelves}
+      />
+
+      <ShelfManagementModal
+        isOpen={isShelfModalOpen}
+        onClose={() => {
+          setIsShelfModalOpen(false);
+          setShelfModalTarget(undefined);
+        }}
+        shelves={shelves}
+        items={items}
+        onSaveShelves={handleSaveShelves}
+        initialTarget={shelfModalTarget}
       />
 
       <ItemDetailDrawer

@@ -34,6 +34,7 @@ interface NavbarProps {
   onOpenAuditMode: () => void;
   onOpenAlerts: () => void;
   onOpenAccountManagement: () => void;
+  onOpenShelfManagement?: () => void;
   onResetSeed: () => void;
   onOpenChatbot: () => void;
   activeView: 'list' | 'shelf_map' | 'audit';
@@ -56,6 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuditMode,
   onOpenAlerts,
   onOpenAccountManagement,
+  onOpenShelfManagement,
   onResetSeed,
   onOpenChatbot,
   activeView,
@@ -171,6 +173,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Plus className="w-4 h-4 sm:w-4 sm:h-4 text-emerald-400" />
               <span className="hidden md:inline">新增貨品</span>
             </button>
+
+            {/* Shelf Management */}
+            {onOpenShelfManagement && (
+              <button
+                onClick={onOpenShelfManagement}
+                className="p-2 sm:px-3 sm:py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="貨架結構與層數設定"
+              >
+                <Warehouse className="w-4 h-4 text-amber-400" />
+                <span className="hidden md:inline">貨架管理</span>
+              </button>
+            )}
 
             {/* Admin Only: Accounts Management */}
             {isAdmin && (

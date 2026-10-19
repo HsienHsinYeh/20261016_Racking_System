@@ -13,7 +13,7 @@ import {
   HelpCircle,
   Image as ImageIcon
 } from 'lucide-react';
-import { InventoryItem } from '../types/inventory';
+import { InventoryItem, ShelfZoneConfig, DEFAULT_SHELF_ZONES } from '../types/inventory';
 
 interface ItemEditModalProps {
   isOpen: boolean;
@@ -27,6 +27,7 @@ interface ItemEditModalProps {
     tier?: string;
     bin?: string;
   };
+  shelves?: ShelfZoneConfig[];
 }
 
 const FINISHED_PRODUCT_PRESETS = [
@@ -54,7 +55,9 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
   onSave,
   item,
   defaultShelf,
+  shelves,
 }) => {
+  const zoneList = shelves && shelves.length > 0 ? shelves : DEFAULT_SHELF_ZONES;
   const isEditing = !!item;
 
   // Form states
@@ -115,6 +118,22 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
   }, [item, defaultShelf, isOpen]);
 
   if (!isOpen) return null;
+
+  const currentZoneObj = zoneList.find(z => z.id === zone) || zoneList[0];
+  const availableRacks = currentZoneObj?.racks || [];
+  const currentRackObj = availableRacks.find(r => (typeof r === 'string' ? r === rack : r.code === rack));
+  const maxTier = currentRackObj ? (typeof currentRackObj === 'string' ? 4 : (currentRackObj.tierCount || 4)) : 4;
+  const maxBins = currentRackObj ? (typeof currentRackObj === 'string' ? 4 : (currentRackObj.binsPerTier || 4)) : 4;
+
+  const handleZoneChange = (newZone: string) => {
+    setZone(newZone);
+    const targetZoneObj = zoneList.find(z => z.id === newZone);
+    if (targetZoneObj && targetZoneObj.racks.length > 0) {
+      const firstRack = targetZoneObj.racks[0];
+      const firstRackCode = typeof firstRack === 'string' ? firstRack : firstRack.code;
+      setRack(firstRackCode);
+    }
+  };
 
   // Formatted shelf location
   const formattedShelfLocation = `${zone}-${rack}架-${tier}-${bin}位`;
@@ -373,13 +392,14 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
                 <label className="block text-[11px] text-slate-400 mb-1">區域</label>
                 <select
                   value={zone}
-                  onChange={(e) => setZone(e.target.value)}
-                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold"
+                  onChange={(e) => handleZoneChange(e.target.value)}
+                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200"
                 >
-                  <option value="A區">A區</option>
-                  <option value="B區">B區</option>
-                  <option value="C區">C區</option>
-                  <option value="D區">D區</option>
+                  {zoneList.map((z) => (
+                    <option key={z.id} value={z.id}>
+                      {z.name || z.id}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -388,11 +408,21 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
                 <select
                   value={rack}
                   onChange={(e) => setRack(e.target.value)}
-                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold"
+                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200"
                 >
-                  {['01', '02', '03', '04'].map((r) => (
-                    <option key={r} value={r}>{r}架</option>
-                  ))}
+                  {availableRacks.length > 0 ? (
+                    availableRacks.map((r) => {
+                      const rCode = typeof r === 'string' ? r : r.code;
+                      const rName = typeof r === 'string' ? `${r}架` : `${r.code}架 (${r.name})`;
+                      return (
+                        <option key={rCode} value={rCode}>
+                          {rName}
+                        </option>
+                      );
+                    })
+                  ) : (
+                    <option value={rack}>{rack}架</option>
+                  )}
                 </select>
               </div>
 
@@ -401,9 +431,9 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
                 <select
                   value={tier}
                   onChange={(e) => setTier(e.target.value)}
-                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold"
+                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200"
                 >
-                  {['1層', '2層', '3層', '4層'].map((t) => (
+                  {Array.from({ length: maxTier }, (_, i) => `${i + 1}層`).map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -414,9 +444,9 @@ export const ItemEditModal: React.FC<ItemEditModalProps> = ({
                 <select
                   value={bin}
                   onChange={(e) => setBin(e.target.value)}
-                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold"
+                  className="w-full p-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-200"
                 >
-                  {['01', '02', '03', '04'].map((b) => (
+                  {Array.from({ length: maxBins }, (_, i) => String(i + 1).padStart(2, '0')).map((b) => (
                     <option key={b} value={b}>{b}位</option>
                   ))}
                 </select>

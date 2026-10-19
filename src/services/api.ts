@@ -1,4 +1,4 @@
-import { InventoryItem, SystemAlert, Operator, ConnectedUser, AuthUser, ManagedAccount } from '../types/inventory';
+import { InventoryItem, SystemAlert, Operator, ConnectedUser, AuthUser, ManagedAccount, ShelfZoneConfig } from '../types/inventory';
 
 type WebSocketEventHandler = {
   onInit?: (data: { items: InventoryItem[]; alerts: SystemAlert[]; onlineCount: number }) => void;
@@ -9,6 +9,7 @@ type WebSocketEventHandler = {
   onAlertsSync?: (data: { alerts: SystemAlert[] }) => void;
   onPresenceSync?: (data: { users: ConnectedUser[]; totalCount: number }) => void;
   onOperatorsSync?: (data: { operators: Operator[] }) => void;
+  onShelvesSync?: (data: { shelves: ShelfZoneConfig[] }) => void;
   onStatusChange?: (connected: boolean) => void;
 };
 
@@ -269,6 +270,25 @@ class RealtimeInventoryClient {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || '刪除帳號失敗');
+  }
+
+  // Shelf Management
+  public async fetchShelves(): Promise<ShelfZoneConfig[]> {
+    const res = await fetch('/api/shelves');
+    if (!res.ok) throw new Error('無法讀取貨架設定');
+    const data = await res.json();
+    return data.shelves || [];
+  }
+
+  public async saveShelves(shelves: ShelfZoneConfig[]): Promise<ShelfZoneConfig[]> {
+    const res = await fetch('/api/shelves', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shelves })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '儲存貨架設定失敗');
+    return data.shelves;
   }
 }
 

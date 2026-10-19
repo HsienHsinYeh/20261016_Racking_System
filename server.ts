@@ -12,6 +12,7 @@ const PORT = 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'inventory.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const SHELVES_FILE = path.join(DATA_DIR, 'shelves.json');
 
 const DGX_API_URL = 'https://dgx-api.ovantech.com.tw/v1/chat/completions';
 const DGX_API_KEY = 'dgx_Q4txLJEuu5qqZDmjT5EdYE9jVmDxQFvDi3fgBCxTSto';
@@ -478,6 +479,31 @@ function saveItems(items: InventoryItem[]) {
     fs.writeFileSync(DATA_FILE, JSON.stringify(items, null, 2), 'utf-8');
   } catch (err) {
     console.error('Error saving inventory file:', err);
+  }
+}
+
+function loadShelves(): any[] {
+  try {
+    ensureDataDir();
+    if (fs.existsSync(SHELVES_FILE)) {
+      const raw = fs.readFileSync(SHELVES_FILE, 'utf-8');
+      const data = JSON.parse(raw);
+      if (Array.isArray(data) && data.length > 0) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.error('Error loading shelves file:', err);
+  }
+  return [];
+}
+
+function saveShelves(shelves: any[]) {
+  try {
+    ensureDataDir();
+    fs.writeFileSync(SHELVES_FILE, JSON.stringify(shelves, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving shelves file:', err);
   }
 }
 
@@ -1237,6 +1263,26 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
       department: u.department,
     }));
     res.json({ success: true, operators: ops });
+  });
+
+  // 8.1 Shelf Configurations
+  app.get('/api/shelves', (req, res) => {
+    const shelves = loadShelves();
+    res.json({ success: true, shelves });
+  });
+
+  app.post('/api/shelves', (req, res) => {
+    try {
+      const { shelves } = req.body || {};
+      if (!shelves || !Array.isArray(shelves)) {
+        return res.status(400).json({ error: '無效的貨架設定資料格式' });
+      }
+      saveShelves(shelves);
+      broadcast('shelves:sync', { shelves });
+      res.json({ success: true, shelves });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // 9. Reset seed data if needed

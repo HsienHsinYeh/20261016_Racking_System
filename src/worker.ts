@@ -1,5 +1,6 @@
 import SEED_ITEMS_DATA from '../data/inventory.json';
 import USER_ACCOUNTS_DATA from '../data/users.json';
+import DEFAULT_SHELVES_DATA from '../data/shelves.json';
 import { InventoryItem, InventoryHistory, SystemAlert } from './types/inventory';
 
 export interface Env {
@@ -11,6 +12,7 @@ export interface Env {
 
 const SEED_ITEMS = SEED_ITEMS_DATA as InventoryItem[];
 const USER_ACCOUNTS = USER_ACCOUNTS_DATA as any[];
+const DEFAULT_SHELVES = DEFAULT_SHELVES_DATA as any[];
 
 const DGX_API_URL = 'https://dgx-api.ovantech.com.tw/v1/chat/completions';
 const DGX_API_KEY = 'dgx_Q4txLJEuu5qqZDmjT5EdYE9jVmDxQFvDi3fgBCxTSto';
@@ -82,6 +84,31 @@ async function saveUsers(env: Env, users: any[]): Promise<void> {
       await env.INVENTORY_KV.put('user_accounts', JSON.stringify(users));
     } catch (err) {
       console.warn('Error saving users to KV:', err);
+    }
+  }
+}
+
+async function getShelves(env: Env): Promise<any[]> {
+  if (env.INVENTORY_KV) {
+    try {
+      const raw = await env.INVENTORY_KV.get('shelf_configs');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (err) {
+      console.warn('Error reading shelves from KV:', err);
+    }
+  }
+  return [...DEFAULT_SHELVES];
+}
+
+async function saveShelves(env: Env, shelves: any[]): Promise<void> {
+  if (env.INVENTORY_KV) {
+    try {
+      await env.INVENTORY_KV.put('shelf_configs', JSON.stringify(shelves));
+    } catch (err) {
+      console.warn('Error saving shelves to KV:', err);
     }
   }
 }
@@ -726,6 +753,22 @@ ${JSON.stringify(context?.warehouseData || {}, null, 2)}
             department: u.department,
           }));
           return jsonResponse({ success: true, operators: ops });
+        }
+
+        // Shelf Configurations
+        if (path === '/api/shelves' && method === 'GET') {
+          const shelves = await getShelves(env);
+          return jsonResponse({ success: true, shelves });
+        }
+
+        if (path === '/api/shelves' && method === 'POST') {
+          const body: any = await request.json().catch(() => ({}));
+          const { shelves } = body;
+          if (!shelves || !Array.isArray(shelves)) {
+            return errorResponse('無效的貨架設定資料格式', 400);
+          }
+          await saveShelves(env, shelves);
+          return jsonResponse({ success: true, shelves });
         }
 
         // Reset seed
