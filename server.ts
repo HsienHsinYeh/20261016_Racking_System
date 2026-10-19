@@ -646,13 +646,20 @@ async function startServer() {
     // Send initial snapshot
     const items = loadItems();
     const alerts = generateAlerts(items);
+    const shelves = loadShelves();
     ws.send(JSON.stringify({
       event: 'init',
       payload: {
         items,
         alerts,
+        shelves,
         onlineCount: clients.size
       }
+    }));
+
+    ws.send(JSON.stringify({
+      event: 'shelves:sync',
+      payload: { shelves }
     }));
 
     broadcastOnlineUsers();

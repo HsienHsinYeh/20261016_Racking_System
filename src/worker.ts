@@ -30,6 +30,8 @@ function jsonResponse(data: any, status = 200): Response {
     headers: {
       ...corsHeaders,
       'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-cache, no-store, must-revalidate, max-age=0',
+      'Pragma': 'no-cache',
     },
   });
 }
@@ -213,6 +215,7 @@ export default {
       const items = await getItems(env);
       const alerts = generateAlerts(items);
       const users = await getUsers(env);
+      const shelves = await getShelves(env);
       const operators = users.map((u: any) => ({
         id: u.id,
         name: u.name,
@@ -228,6 +231,7 @@ export default {
           payload: {
             items,
             alerts,
+            shelves,
             onlineCount: 1,
           },
         })
@@ -237,6 +241,13 @@ export default {
         JSON.stringify({
           event: 'operators:sync',
           payload: { operators },
+        })
+      );
+
+      server.send(
+        JSON.stringify({
+          event: 'shelves:sync',
+          payload: { shelves },
         })
       );
 

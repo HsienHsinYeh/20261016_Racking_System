@@ -146,6 +146,10 @@ export default function App() {
         setItems(data.items);
         setAlerts(data.alerts);
         setOnlineCount(data.onlineCount);
+        if (data.shelves && Array.isArray(data.shelves) && data.shelves.length > 0) {
+          setShelves(data.shelves);
+          localStorage.setItem('hh_wms_shelves', JSON.stringify(data.shelves));
+        }
         setLoading(false);
       },
       onItemCreated: ({ item, operator }) => {
@@ -234,6 +238,12 @@ export default function App() {
           setOperators(newOps);
         }
       },
+      onShelvesSync: ({ shelves: newShelves }) => {
+        if (newShelves && Array.isArray(newShelves) && newShelves.length > 0) {
+          setShelves(newShelves);
+          localStorage.setItem('hh_wms_shelves', JSON.stringify(newShelves));
+        }
+      },
       onStatusChange: (status) => {
         setIsConnected(status);
       }
@@ -305,6 +315,57 @@ export default function App() {
         setAlerts(initialAlerts);
       })
       .catch(console.warn);
+
+    // Periodic synchronization & visibility change for mobile devices
+    const syncAllData = () => {
+      realtimeClient.fetchShelves()
+        .then(latestShelves => {
+          if (latestShelves && latestShelves.length > 0) {
+            setShelves(prev => {
+              if (JSON.stringify(prev) !== JSON.stringify(latestShelves)) {
+                localStorage.setItem('hh_wms_shelves', JSON.stringify(latestShelves));
+                return latestShelves;
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+
+      realtimeClient.fetchInventory()
+        .then(latestItems => {
+          if (latestItems && latestItems.length > 0) {
+            setItems(prev => {
+              if (
+                prev.length !== latestItems.length ||
+                prev.some((item, i) => item.quantity !== latestItems[i]?.quantity || item.shelfLocation !== latestItems[i]?.shelfLocation)
+              ) {
+                return latestItems;
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+    };
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        syncAllData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Heartbeat sync every 4 seconds (guarantees phone updates immediately when computer edits)
+    const pollInterval = setInterval(syncAllData, 4000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      clearInterval(pollInterval);
+    };
   }, [addToast]);
 
   // Handle Login Success
@@ -522,6 +583,52 @@ export default function App() {
     }
   };
 
+  // Immediate re-fetch whenever user switches to Visual Shelf Map
+  useEffect(() => {
+    if (activeView === 'shelf_map') {
+      realtimeClient.fetchShelves()
+        .then(latest => {
+          if (latest && latest.length > 0) {
+            setShelves(latest);
+            localStorage.setItem('hh_wms_shelves', JSON.stringify(latest));
+          }
+        })
+        .catch(console.warn);
+
+      realtimeClient.fetchInventory()
+        .then(latestItems => {
+          if (latestItems && latestItems.length > 0) {
+            setItems(latestItems);
+          }
+        })
+        .catch(console.warn);
+    }
+  }, [activeView]);
+
+  // Manual refresh handler for Visual Shelf Map
+  const handleManualRefreshShelves = async () => {
+    try {
+      const [latestShelves, latestItems] = await Promise.all([
+        realtimeClient.fetchShelves(),
+        realtimeClient.fetchInventory()
+      ]);
+      if (latestShelves && latestShelves.length > 0) {
+        setShelves(latestShelves);
+        localStorage.setItem('hh_wms_shelves', JSON.stringify(latestShelves));
+      }
+      if (latestItems && latestItems.length > 0) {
+        setItems(latestItems);
+      }
+      addToast({
+        title: '🔄 貨架資料已同步',
+        message: '立體貨架矩陣與物料配置已成功刷新為最新狀態',
+        type: 'success'
+      });
+    } catch (err: any) {
+      console.warn('Manual refresh failed:', err);
+    }
+  };
+
   // QR Scanner found actions
   const handleFoundItemFromScan = (item: InventoryItem) => {
     setSelectedItemDrawer(item);
@@ -660,6 +767,7 @@ export default function App() {
             }}
             canManageShelves={userPermissions.canManageShelves}
             canModifyData={userPermissions.canModifyData}
+            onRefresh={handleManualRefreshShelves}
           />
         )}
 

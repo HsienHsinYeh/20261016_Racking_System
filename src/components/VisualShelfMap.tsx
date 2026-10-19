@@ -14,7 +14,8 @@ import {
   ExternalLink,
   Edit3,
   Settings,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 import { InventoryItem, ShelfZoneConfig, DEFAULT_SHELF_ZONES } from '../types/inventory';
 
@@ -25,6 +26,7 @@ interface VisualShelfMapProps {
   onAddItemToShelf: (shelfLocation: string, zone: string, rack: string, tier: string, bin: string) => void;
   onGenerateShelfQr: (shelfLocation: string) => void;
   onOpenShelfManagement: (rackTarget?: { zoneId: string; rackCode: string }) => void;
+  onRefresh?: () => void;
   canManageShelves?: boolean;
   canModifyData?: boolean;
 }
@@ -36,6 +38,7 @@ export const VisualShelfMap: React.FC<VisualShelfMapProps> = ({
   onAddItemToShelf,
   onGenerateShelfQr,
   onOpenShelfManagement,
+  onRefresh,
   canManageShelves = true,
   canModifyData = true,
 }) => {
@@ -43,6 +46,25 @@ export const VisualShelfMap: React.FC<VisualShelfMapProps> = ({
   const [selectedZone, setSelectedZone] = useState('A區');
   const [selectedSlot, setSelectedSlot] = useState<string | null>('A區-01架-2層-01位');
   const [shelfSearch, setShelfSearch] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-sync selectedZone if current zone is removed or renamed on other devices
+  React.useEffect(() => {
+    if (zoneList && zoneList.length > 0) {
+      if (!zoneList.some(z => z.id === selectedZone)) {
+        setSelectedZone(zoneList[0].id);
+      }
+    }
+  }, [zoneList, selectedZone]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await onRefresh?.();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
 
   const currentZoneConfig = zoneList.find(z => z.id === selectedZone) || zoneList[0];
 
@@ -109,6 +131,16 @@ export const VisualShelfMap: React.FC<VisualShelfMapProps> = ({
                 </button>
               </>
             )}
+
+            {/* Refresh Button */}
+            <button
+              onClick={handleRefresh}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 transition-all cursor-pointer active:scale-95"
+              title="立即同步最新貨架矩陣與物料配置"
+            >
+              <RefreshCw className={`w-4 h-4 text-amber-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">即時同步</span>
+            </button>
             <div className="relative min-w-[200px]">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input

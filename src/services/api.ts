@@ -1,7 +1,7 @@
 import { InventoryItem, SystemAlert, Operator, ConnectedUser, AuthUser, ManagedAccount, ShelfZoneConfig } from '../types/inventory';
 
 type WebSocketEventHandler = {
-  onInit?: (data: { items: InventoryItem[]; alerts: SystemAlert[]; onlineCount: number }) => void;
+  onInit?: (data: { items: InventoryItem[]; alerts: SystemAlert[]; onlineCount: number; shelves?: ShelfZoneConfig[] }) => void;
   onItemCreated?: (data: { item: InventoryItem; operator: string }) => void;
   onItemUpdated?: (data: { item: InventoryItem; operator: string; action?: string; delta?: number }) => void;
   onItemCounted?: (data: { item: InventoryItem; operator: string; discrepancy: number; physicalQty: number }) => void;
@@ -75,6 +75,9 @@ class RealtimeInventoryClient {
           switch (evt) {
             case 'init':
               this.handlers.onInit?.(payload);
+              if (payload?.shelves && Array.isArray(payload.shelves)) {
+                this.handlers.onShelvesSync?.({ shelves: payload.shelves });
+              }
               break;
             case 'item:created':
               this.handlers.onItemCreated?.(payload);
@@ -96,6 +99,9 @@ class RealtimeInventoryClient {
               break;
             case 'operators:sync':
               this.handlers.onOperatorsSync?.(payload);
+              break;
+            case 'shelves:sync':
+              this.handlers.onShelvesSync?.(payload);
               break;
           }
         } catch (err) {
@@ -135,7 +141,13 @@ class RealtimeInventoryClient {
 
   // REST API Methods
   public async fetchInventory(): Promise<InventoryItem[]> {
-    const res = await fetch('/api/inventory');
+    const res = await fetch(`/api/inventory?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
     if (!res.ok) throw new Error('無法讀取庫存資料');
     const data = await res.json();
     return data.items || [];
@@ -269,7 +281,13 @@ class RealtimeInventoryClient {
 
   // Shelf Management
   public async fetchShelves(): Promise<ShelfZoneConfig[]> {
-    const res = await fetch('/api/shelves');
+    const res = await fetch(`/api/shelves?_t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
+    });
     if (!res.ok) throw new Error('無法讀取貨架設定');
     const data = await res.json();
     return data.shelves || [];
