@@ -169,22 +169,49 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
   // Edit current zone title / desc
   const handleSaveCurrentZoneMeta = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editZoneName.trim()) return;
+    const newName = editZoneName.trim();
+    if (!newName) return;
+
+    const oldZoneId = currentZone.id;
+    // Determine whether to update zone.id as well:
+    // If the old ID was the same as the old name, or if user customized the zone name, we update the ID
+    const shouldUpdateId = oldZoneId === currentZone.name || !shelves.some(z => z.id === newName);
+    const newZoneId = shouldUpdateId ? newName : oldZoneId;
+
+    if (newZoneId !== oldZoneId && shelves.some(z => z.id === newZoneId)) {
+      setError(`分區代碼【${newZoneId}】已存在，請使用不同名稱！`);
+      return;
+    }
 
     const updated = shelves.map(z => {
-      if (z.id === currentZone.id) {
+      if (z.id === oldZoneId) {
         return {
           ...z,
-          name: editZoneName.trim(),
-          desc: editZoneDesc.trim()
+          id: newZoneId,
+          name: newName,
+          desc: editZoneDesc.trim(),
+          racks: (z.racks || []).map(r => ({
+            ...r,
+            zoneId: newZoneId
+          }))
         };
       }
       return z;
     });
 
-    await onSaveShelves(updated);
+    const migrationConfig = newZoneId !== oldZoneId ? {
+      fromLocationPrefix: `${oldZoneId}-`,
+      toLocationPrefix: `${newZoneId}-`,
+      oldZone: oldZoneId,
+      newZone: newZoneId,
+      oldRack: '',
+      newRack: ''
+    } : undefined;
+
+    await onSaveShelves(updated, migrationConfig);
+    setSelectedZoneId(newZoneId);
     setIsEditingZone(false);
-    setSuccessMsg(`分區【${currentZone.id}】名稱與說明已更新！`);
+    setSuccessMsg(`分區【${newName}】名稱與說明已同步更新！`);
   };
 
   // Delete empty zone
@@ -527,7 +554,7 @@ export const ShelfManagementModal: React.FC<ShelfManagementModalProps> = ({
                           : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
                       }`}
                     >
-                      <span>{zone.id}</span>
+                      <span>{zone.name || zone.id}</span>
                       <span className="text-xs px-1.5 py-0.2 rounded-md bg-slate-200 dark:bg-slate-700 font-mono">
                         {rackCount}架 / {zoneItemsCount}品
                       </span>

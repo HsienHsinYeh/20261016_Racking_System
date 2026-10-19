@@ -386,16 +386,27 @@ export default function App() {
       await realtimeClient.saveShelves(updatedShelves);
 
       // If any items were migrated due to shelf code change, update items
-      if (migratedItems && migratedItems.length > 0) {
-        for (const migration of migratedItems) {
-          const itemsToUpdate = items.filter(i => i.shelfLocation.startsWith(migration.originalLocationPrefix));
+      const migrations = Array.isArray(migratedItems) 
+        ? migratedItems 
+        : (migratedItems ? [migratedItems] : []);
+
+      if (migrations.length > 0) {
+        for (const migration of migrations) {
+          const fromPrefix = (migration as any).originalLocationPrefix || (migration as any).fromLocationPrefix;
+          const toPrefix = (migration as any).newLocationPrefix || (migration as any).toLocationPrefix;
+          if (!fromPrefix || !toPrefix) continue;
+
+          const itemsToUpdate = items.filter(i => 
+            i.shelfLocation.startsWith(fromPrefix) || 
+            ((migration as any).oldZone && i.zone === (migration as any).oldZone)
+          );
           for (const item of itemsToUpdate) {
-            const newShelfLocation = item.shelfLocation.replace(
-              migration.originalLocationPrefix,
-              migration.newLocationPrefix
-            );
+            const newShelfLocation = item.shelfLocation.startsWith(fromPrefix)
+              ? item.shelfLocation.replace(fromPrefix, toPrefix)
+              : item.shelfLocation;
             const parts = newShelfLocation.split('-');
-            const newZone = parts[0] || item.zone;
+            const newZone = (migration as any).newZone || parts[0] || item.zone;
+            const newRack = (migration as any).newRack || parts[1] || item.shelfRack;
             await realtimeClient.updateItem(
               item.id,
               {
